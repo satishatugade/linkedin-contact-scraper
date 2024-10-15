@@ -15,3 +15,8 @@ __pycache__/
 # Ignore screenshots directory
 screenshots/
 logs/
+models/
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
