@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.excel_processor import excel_to_db_postgres
+from service.excel_processor import excel_to_db_postgres
 import utils.logging as logger
 import os
 from dotenv import load_dotenv
@@ -11,20 +11,16 @@ excel_blueprint = Blueprint('excel', __name__)
 def generate_taxonomy_database():
     try:
         logger.log_message(f"Started processing Excel files", level='info')
-
         l1_file = request.files.get('l1')
         l2_file = request.files.get('l2')
-
-        
+      
         if not l1_file or not l2_file:
             logger.log_message(f"Both 'l1' and 'l2' files are required", level='error')
             return jsonify({"error": "Both 'l1' and 'l2' files are required"}), 400
-
-        
+       
         temp_dir = './temp'
         os.makedirs(temp_dir, exist_ok=True)
 
-        
         l1_file_path = os.path.join(temp_dir, l1_file.filename)
         l1_file.save(l1_file_path)
 

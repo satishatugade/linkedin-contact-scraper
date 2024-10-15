@@ -9,7 +9,7 @@ import time
 
 contact_scraper_bp = Blueprint('scraper', __name__)
 
-@contact_scraper_bp.route('/api/linkedin-contacts', methods=['POST'])
+@contact_scraper_bp.route('/api/linkedin-contacts-scraper', methods=['POST'])
 def scrape_linkedin():
    
     data = request.get_json()
@@ -23,7 +23,7 @@ def scrape_linkedin():
     if not session_id or not li_at_value:
         
         logger.log_message(f"session_id and li_at_value are required")
-        return jsonify({'error': 'session_id and li_at_value are required'}), 400
+        return jsonify({'error': 'session Id and token is required'}), 400
 
     # Set up Selenium options
     options = Options()

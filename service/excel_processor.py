@@ -5,9 +5,7 @@ from psycopg2 import sql
 
 def excel_to_db_postgres(excel_file, db_params):
     table_name = os.path.splitext(os.path.basename(excel_file))[0].lower()
-
-    try:
-        
+    try:   
         conn = psycopg2.connect(
             dbname=db_params['dbname'],
             user=db_params['user'],
@@ -15,9 +13,7 @@ def excel_to_db_postgres(excel_file, db_params):
             host=db_params['host'],
             port=db_params['port']
         )
-        cursor = conn.cursor()
-
-     
+        cursor = conn.cursor()   
         sheets = pd.read_excel(excel_file, sheet_name=None)
         df = pd.concat(sheets.values(), ignore_index=True)
 
@@ -28,7 +24,6 @@ def excel_to_db_postgres(excel_file, db_params):
         columns = ", ".join([f"{col} TEXT" for col in df_columns])
         create_table_query = f"CREATE TABLE {table_name} ({columns});"
         cursor.execute(create_table_query)
-
         
         for _, row in df.iterrows():
             insert_query = sql.SQL("INSERT INTO {} VALUES ({})").format(
@@ -37,7 +32,6 @@ def excel_to_db_postgres(excel_file, db_params):
             )
             cursor.execute(insert_query)
 
-        
         conn.commit()
         cursor.close()
         conn.close()

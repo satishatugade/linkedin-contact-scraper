@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.ocr_logic import main  
+from service.ocr_logic import main  
 import os
 
 ocr_blueprint = Blueprint('ocr', __name__)
