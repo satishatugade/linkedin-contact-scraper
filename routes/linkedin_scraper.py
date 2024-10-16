@@ -11,9 +11,9 @@ from config import database_config as DB
 
 class ContactInfo:
     """Class to represent LinkedIn contact information."""
-    def __init__(self, sddh_id, linkdin_link):
+    def __init__(self, sddh_id, company_linkdin_link):
         self.sddh_id = sddh_id
-        self.linkdin_link = linkdin_link
+        self.company_linkdin_link = company_linkdin_link
 
 def fetch_sddh_by_id(sddh_id):
     conn = DB.database_connection()
@@ -41,6 +41,7 @@ def fetch_sddh_by_id(sddh_id):
             conn.close()
             
 def fetch_linkedin_url_dump_detail_table(sddh_id):
+    logger.log_message(f"fetch_linkedin_url_dump_detail_table Event Id :",sddh_id)
     db_conn = DB.database_connection()
     if not db_conn:
         print("Failed to connect to the database")
@@ -210,12 +211,12 @@ def is_login_successful(driver):
         logger.log_message(f"Login unsuccessful. Current URL: {driver.current_url}",level='error')
         return False
 
-def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode):
+def process_event_page(driver, wait, company_linkdin_link, sddh_id, scraping_mode):
     """Process LinkedIn event page based on scraping mode."""
-    driver.get(linkedin_event_url.strip())
+    driver.get(company_linkdin_link.strip())
     wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
     time.sleep(5)
-
+# linkedin_event_url
     linkedin_url = None  
     if click_attend_button(driver, wait):
         linkedin_url = driver.current_url  
@@ -223,14 +224,14 @@ def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode)
 
         # Try to click the 'Attendees' link and paginate through the attendees
         if click_attendees_link(driver, wait):
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url)
+            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url,company_linkdin_link)
 
     else:
         if click_attendees_link(driver, wait):
             linkedin_url = driver.current_url  # Capture the current URL
             logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_url}",level='info')
 
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url)
+            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url,company_linkdin_link)
 
         else:
             logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
@@ -298,7 +299,7 @@ def get_upcoming_event_links(driver, wait):
         logger.log_message(f"Error fetching upcoming event links:",level='error')
         return []
 
-def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url):
+def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url,company_linkdin_link):
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.",level='info')
     page_count = 1
@@ -362,7 +363,7 @@ def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url):
                         "occupation": occupation,
                         "profile_url": profile_url,
                         "linkedin_url": linkedin_url,  # Save the LinkedIn URL
-                        "company_url": company_url,    # Save the company URL
+                        "company_url": company_linkdin_link,    # Save the company URL
                         "source": scraping_mode,       # Save scraping mode (selenium or ocr)
                         "error_reason": ""
                     }
