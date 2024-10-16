@@ -177,26 +177,17 @@ import pytz
 
 import inspect
 import utils.logging as logger
+import config.database_config as DB
 
 # pytesseract.pytesseract_cmd = r'D:\\Tesseract-OCR\\tesseract.exe'
 
-def connect_db():
-    try:
-        conn = psycopg2.connect(
-            dbname="uq_eventible",
-            user="postgres",
-            password="123456789",
-            host="localhost",
-            port="5432"
-        )
-        logger.log_message("Successfully connected to the database.", level='info')
-        return conn
-    except Exception as e:
-        logger.log_message(f"Error connecting to database: {e}", level='error', error=str(e))
-        return None
 
+def save_to_db(name, occupation, location, sddh_id):
 # Save extracted information to database
-def save_to_db(conn, name, occupation, location, sddh_id):
+    conn = DB.database_connection()
+    if not conn:
+        logger.log_message(f"Failed to connect to database. Exiting.", level='error')
+        return
     try:
         timezone = pytz.timezone("Asia/Kolkata")
         created_date = datetime.now(timezone)
@@ -268,7 +259,8 @@ def get_coordinates(image_path):
         return None
 
 # Process the image and extract text using Tesseract OCR
-def process_image(image_path, coords, conn, sddh_id):
+def process_image(image_path, coords, sddh_id):
+    
     image = cv2.imread(image_path)
     clone = image.copy()
 
@@ -290,15 +282,12 @@ def process_image(image_path, coords, conn, sddh_id):
         print(f"OCR Result for {os.path.basename(image_path)}: Name: {name}, Occupation: {occupation}, Location: {location}")
         print('-' * 50)
 
-        if conn:
-            save_to_db(conn, name, occupation, location, sddh_id)
+       
+        save_to_db(name, occupation, location, sddh_id)
 
 
 def main(root_folder):
-    conn = connect_db()
-    if not conn:
-        logger.log_message(f"Failed to connect to database. Exiting.", level='error')
-        return
+   
 
     selected_subfolder = os.listdir(root_folder)[0]
     selected_subfolder_path = os.path.join(root_folder, selected_subfolder)
@@ -334,15 +323,12 @@ def main(root_folder):
             print()
             before_scroll_image = os.path.join(subfolder_path, f"{subfolder}_page_{page_number}_before_scroll.png")
             after_scroll_image = os.path.join(subfolder_path, f"{subfolder}_page_{page_number}_after_scroll.png")
-
+            logger.log_message(f"selected the coordinates for ocr",level='info')
             if os.path.exists(before_scroll_image) and os.path.exists(after_scroll_image):
-                process_image(before_scroll_image, [coordinates_before_scroll], conn, sddh_id)
-                process_image(after_scroll_image, [coordinates_after_scroll], conn, sddh_id)
+                process_image(before_scroll_image, [coordinates_before_scroll], sddh_id)
+                process_image(after_scroll_image, [coordinates_after_scroll], sddh_id)
             else:
                 break
 
             page_number += 1
 
-    if conn:
-        conn.close()
-        logger.log_message(f"Database connection closed.", level='info')

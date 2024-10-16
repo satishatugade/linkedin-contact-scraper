@@ -5,7 +5,7 @@ from routes.category_controller import l1_model_blueprint
 from routes.category_controller import fetch_categories_blueprint
 from routes.contacts_controller import contact_scraper_bp
 from routes.excel_controller import excel_blueprint
-
+from routes.ocr_controller import ocr_blueprint
 from utils.logging import setup_logging
 
 setup_logging()
@@ -19,7 +19,7 @@ app.register_blueprint(l1_model_blueprint)
 app.register_blueprint(fetch_categories_blueprint)
 app.register_blueprint(contact_scraper_bp)
 app.register_blueprint(excel_blueprint)
-
+app.register_blueprint(ocr_blueprint)
 
 @app.route('/', methods=['GET'])
 def getHome():

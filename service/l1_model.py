@@ -9,28 +9,21 @@ import pickle
 import os
 from dotenv import load_dotenv
 import utils.logging as logger 
+import config.database_config as DB
 load_dotenv()
 
 def fetch_data_from_db():
     try:
         logger.log_message(f"Fetching data from the database", level='info')
-        dbname = os.getenv('DB_NAME')  
-        user = os.getenv('DB_USER')  
-        password = os.getenv('DB_PASSWORD')  
-        host = os.getenv('DB_HOST')  
-        port = os.getenv('DB_PORT')  
-        if not all([dbname, user, password, host, port]):
-            raise ValueError("Database credentials are missing from environment variables")
+        engine= DB.database_connection()
 
-        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{dbname}')
-        
         
         query = "SELECT phrase, label FROM L1_tags"
         df = pd.read_sql(query, engine)
         logger.log_message(f"Data fetched successfully", level='info')
         return df
+
     except Exception as e:
-       
         logger.log_message(f"Error fetching data from the database", level='error', error=str(e))
         raise
 

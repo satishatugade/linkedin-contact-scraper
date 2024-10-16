@@ -7,6 +7,7 @@ from sklearn.metrics import classification_report
 import pickle
 import os
 from dotenv import load_dotenv
+import config.database_config as DB
 import utils.logging as logger
  
 load_dotenv()
@@ -14,23 +15,21 @@ load_dotenv()
 def fetch_data_from_db():
     try:
         logger.log_message(f"Fetching data from the database", level='info')
-        dbname = os.getenv('DB_NAME')
-        user = os.getenv('DB_USER')
-        password = os.getenv('DB_PASSWORD')
-        host = os.getenv('DB_HOST')
-        port = os.getenv('DB_PORT')
+        db_params = DB.load_database_config()
 
-        if not all([dbname, user, password, host, port]):
-            raise ValueError("Missing one or more required environment variables for DB connection.")
-        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{dbname}')
-        query = "SELECT phrase, label, l1_category FROM L2_tags"
+        if not all([db_params.get('dbname'), db_params.get('user'), db_params.get('password'), db_params.get('host'), db_params.get('port')]):
+            raise ValueError("Database credentials are missing from the configuration")
+        engine = create_engine(f"postgresql://{db_params['user']}:{db_params['password']}@{db_params['host']}:{db_params['port']}/{db_params['dbname']}")
+       
+        query = "SELECT phrase, label, l1_category FROM l2_tags"
         df = pd.read_sql(query, engine)
-
         logger.log_message(f"Data fetched successfully", level='info')
         return df
+
     except Exception as e:
         logger.log_message(f"Error fetching data from the database", level='error', error=str(e))
         raise
+        
 
 # Analyze and save the model for each l1_category
 def analyze_and_save_model(df, l1_category):

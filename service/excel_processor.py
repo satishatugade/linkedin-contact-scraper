@@ -5,9 +5,14 @@ import config.database_config as DB
 
 def excel_to_db_postgres(excel_file, db_params):
     table_name = os.path.splitext(os.path.basename(excel_file))[0].lower()
-    try:   
-        conn=DB.database_connection()
-        cursor = conn.cursor()   
+    try:
+       
+        conn = DB.database_connection(db_params)
+        
+        if conn is None:
+            raise Exception("Failed to connect to the database. Please check the database parameters and connection.")
+
+        cursor = conn.cursor()
         sheets = pd.read_excel(excel_file, sheet_name=None)
         df = pd.concat(sheets.values(), ignore_index=True)
 

@@ -6,7 +6,7 @@ import time
 import os
 import psycopg2
 # from config.database_config as config
-from config import database_config as config
+from config import database_config as DB
 
 
 class ContactInfo:
@@ -15,26 +15,8 @@ class ContactInfo:
         self.sddh_id = sddh_id
         self.linkdin_link = linkdin_link
 
-# Logging setup
-
-def database_connection():
-    """Connect to the PostgreSQL database."""
-    try:
-        conn = psycopg2.connect(
-            host=config.DB_HOST,
-            port=config.DB_PORT,
-            dbname=config.DB_NAME,
-            user=config.DB_USERNAME,
-            password=config.DB_PASSWORD
-        )
-        return conn
-    except psycopg2.Error as e:
-        logger.log_.error(f"Error connecting to the database: {e}")
-        return None
-
 def fetch_sddh_by_id(sddh_id):
-    """Fetch specific LinkedIn URL for a given sddh_id."""
-    conn = database_connection()
+    conn = DB.database_connection()
     if not conn:
         return None
 
@@ -57,35 +39,120 @@ def fetch_sddh_by_id(sddh_id):
         if conn:
             cursor.close()
             conn.close()
-
-def get_link_from_contact_info():
-    """Fetch LinkedIn URLs for all unprocessed records from the database."""
-    conn = database_connection()
-    if not conn:
+            
+def fetch_linkedin_url_dump_detail_table(sddh_id):
+    db_conn = DB.database_connection()
+    if not db_conn:
+        print("Failed to connect to the database")
         return "failed"
-
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT uddd1.sddh_id, uddd1.datapoint_value AS linkdin_link
-            FROM uq_data_dump_details uddd1
-            JOIN uq_data_dump_details uddd2 ON uddd1.sddh_id = uddd2.sddh_id
-            WHERE uddd1.datapoint_name = 'LinkedinURL' AND uddd2.datapoint_name = 'LinkedInScrapingState'
-            AND uddd2.datapoint_value = 'false';
-        """)
-        results = cursor.fetchall()
-        return [ContactInfo(row[0], row[1]) for row in results]
+        cursor = db_conn.cursor()
+        query = """SELECT uddd1.sddh_id, uddd1.datapoint_value AS linkedin_link
+                   FROM uq_data_dump_details uddd1
+                   JOIN uq_data_dump_details uddd2
+                   ON uddd1.sddh_id = uddd2.sddh_id
+                   WHERE uddd1.datapoint_name = 'LinkedinURL'
+                   AND uddd2.datapoint_name = 'LinkedInScrapingState'
+                   AND uddd2.datapoint_value = 'false'"""
+        if sddh_id != "":
+            query += " AND uddd1.sddh_id = %s"
+            cursor.execute(query, (sddh_id,))
+        else:
+            cursor.execute(query)
+        results = cursor.fetchall()   
+        contact_info_list = [ContactInfo(row[0], row[1]) for row in results]
+        return contact_info_list
+
     except Exception as e:
-        logger.log_message(f"Failed to execute query:",level='error')
+        print(f"Failed to execute query: {e}")
         return "failed"
     finally:
-        if conn:
+        if db_conn:
             cursor.close()
-            conn.close()
+            db_conn.close()   
+    #     if sddh_id and sddh_id.strip() != "":
+    #         query += " AND uddd1.sddh_id = %s"
+    #         cursor.execute(query, (sddh_id,))
+    #     else:
+    #         cursor.execute(query)
+            
+    #     results = cursor.fetchall()
+    #     contact_info_list = [ContactInfo(row[0], row[1]) for row in results]
+    #     return contact_info_list
+    # except Exception as e:
+    #     print(f"Failed to execute query: {e}")
+    #     return "failed"
+    # finally:
+    #     if db_conn:
+    #         cursor.close()
+    #         db_conn.close()
+    # db_conn = DB.database_connection()
+    # if not db_conn:
+    #     print("Failed to connect to the database")
+    #     return "failed"
+    # try:
+    #     cursor = db_conn.cursor()
+    #     query = """SELECT uddd1.sddh_id, uddd1.datapoint_value AS linkedin_link
+    #                 FROM uq_data_dump_details uddd1
+    #                 JOIN uq_data_dump_details uddd2
+    #                 ON uddd1.sddh_id = uddd2.sddh_id
+    #                 WHERE uddd1.datapoint_name = 'LinkedinURL'
+    #                 AND uddd2.datapoint_name = 'LinkedInScrapingState'
+    #                 AND uddd2.datapoint_value = 'false'
+    #                 """
+    #     # if sddhId != "":
+    #     #     query += " AND uddd1.sddh_id = %s"
+    #     #     cursor.execute(query, (sddhId,))
+    #     # else:
+    #     #     cursor.execute(query)
+    #     if sddhId is not None and sddhId != "":
+    #         query += "AND uddd1.sddh_id = %s"
+    #         logger.log_message(f"Query: {query}, Params: {sddhId}", level='info')
+    #         cursor.execute(query, (sddhId,))
+    #     else:
+    #         logger.log_message("Fetching all records, no specific sddh_id provided", level='info')
+    #         cursor.execute(query)
+        
+    #     results = cursor.fetchall()   
+    #     contact_info_list = [ContactInfo(row[0], row[1]) for row in results]
+    #     return contact_info_list
+
+    # except Exception as e:
+    #     print(f"Failed to execute query: {e}")
+    #     return "failed"
+    # finally:
+    #     if db_conn:
+    #         cursor.close()
+    #         db_conn.close()
+
+# def get_link_from_contact_info():
+#     """Fetch LinkedIn URLs for all unprocessed records from the database."""
+#     conn = DB.database_connection()
+#     if not conn:
+#         return "failed"
+
+#     try:
+#         cursor = conn.cursor()
+#         cursor.execute("""
+#             SELECT uddd1.sddh_id, uddd1.datapoint_value AS linkdin_link
+#             FROM uq_data_dump_details uddd1
+#             JOIN uq_data_dump_details uddd2 ON uddd1.sddh_id = uddd2.sddh_id
+#             WHERE uddd1.datapoint_name = 'LinkedinURL' AND uddd2.datapoint_name = 'LinkedInScrapingState'
+#             AND uddd2.datapoint_value = 'false';
+#         """)
+#         results = cursor.fetchall()
+#         return [ContactInfo(row[0], row[1]) for row in results]
+#     except Exception as e:
+#         logger.log_message(f"Failed to execute query:",level='error')
+#         return "failed"
+#     finally:
+#         if conn:
+#             cursor.close()
+#             conn.close()
 
 def save_attendee_data(attendee):
     """Save scraped attendee data to the database."""
-    db_conn = database_connection()
+    db_conn = DB.database_connection()
     if not db_conn:
         logger.log_message(f"Failed to connect to the database",level='info')
         return "failed"
@@ -143,7 +210,7 @@ def is_login_successful(driver):
         logger.log_message(f"Login unsuccessful. Current URL: {driver.current_url}",level='error')
         return False
 
-def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode, company_url):
+def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode):
     """Process LinkedIn event page based on scraping mode."""
     driver.get(linkedin_event_url.strip())
     wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -151,19 +218,19 @@ def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode,
 
     linkedin_url = None  
     if click_attend_button(driver, wait):
-        linkedin_url = driver.current_url  # Capture the current URL
+        linkedin_url = driver.current_url  
         logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_url}",level='info')
 
         # Try to click the 'Attendees' link and paginate through the attendees
         if click_attendees_link(driver, wait):
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url, company_url)
+            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url)
 
     else:
         if click_attendees_link(driver, wait):
             linkedin_url = driver.current_url  # Capture the current URL
             logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_url}",level='info')
 
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url, company_url)
+            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url)
 
         else:
             logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
@@ -173,7 +240,7 @@ def process_event_page(driver, wait, linkedin_event_url, sddh_id, scraping_mode,
                 for event_link in event_links:
                     linkedin_url = event_link
                     logger.log_message(f"Processing upcoming event link: {event_link}",level='info')
-                    process_event_page(driver, wait, event_link, sddh_id, scraping_mode, company_url)
+                    process_event_page(driver, wait, event_link, sddh_id, scraping_mode)
             else:
                 logger.log_message(f"No upcoming events available.",level='info')
 
@@ -231,11 +298,11 @@ def get_upcoming_event_links(driver, wait):
         logger.log_message(f"Error fetching upcoming event links:",level='error')
         return []
 
-def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url, company_url):
+def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_url):
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.",level='info')
     page_count = 1
-    folder_name = f"screenshots_{sddh_id}"
+    folder_name = f"{sddh_id}"
     folder_path = os.path.join(os.getcwd(), "screenshots", folder_name)
     os.makedirs(folder_path, exist_ok=True)
 
