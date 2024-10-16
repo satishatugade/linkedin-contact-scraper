@@ -14,8 +14,6 @@ load_dotenv()
 def fetch_data_from_db():
     try:
         logger.log_message(f"Fetching data from the database", level='info')
-
-        
         dbname = os.getenv('DB_NAME')
         user = os.getenv('DB_USER')
         password = os.getenv('DB_PASSWORD')

@@ -180,9 +180,6 @@ import utils.logging as logger
 
 # pytesseract.pytesseract_cmd = r'D:\\Tesseract-OCR\\tesseract.exe'
 
-
-
-
 def connect_db():
     try:
         conn = psycopg2.connect(

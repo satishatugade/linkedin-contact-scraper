@@ -1,18 +1,12 @@
 import os
 import pandas as pd
-import psycopg2
 from psycopg2 import sql
+import config.database_config as DB
 
 def excel_to_db_postgres(excel_file, db_params):
     table_name = os.path.splitext(os.path.basename(excel_file))[0].lower()
     try:   
-        conn = psycopg2.connect(
-            dbname=db_params['dbname'],
-            user=db_params['user'],
-            password=db_params['password'],
-            host=db_params['host'],
-            port=db_params['port']
-        )
+        conn=DB.database_connection()
         cursor = conn.cursor()   
         sheets = pd.read_excel(excel_file, sheet_name=None)
         df = pd.concat(sheets.values(), ignore_index=True)
