@@ -42,7 +42,7 @@ def scrape_linkedin_atteendees_data():
 
     print(f"linkedin_url_list ",linkedin_url_list)
     for data in linkedin_url_list:
-        process_event_page(driver, wait, data.company_linkdin_link, data.sddh_id, scraping_mode)
+        process_event_page(driver, wait, data.company_linkedin_url, data.sddh_id, scraping_mode)
 
     driver.quit()
     logger.log_message(f"Scraping completed successfully",level='info')

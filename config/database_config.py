@@ -8,7 +8,7 @@ def load_database_config():
     host = os.getenv('DB_HOST', 'localhost')
     port = int(os.getenv('DB_PORT', 5432))
     username = os.getenv('DB_USERNAME', 'postgres')
-    password = os.getenv('DB_PASSWORD', 'root')
+    password = os.getenv('DB_PASSWORD', '123456789')
     dbname = os.getenv('DB_NAME', 'uq_eventible')
 
     return {
@@ -26,6 +26,7 @@ def database_connection():
         f"password={config['password']} dbname={config['dbname']} "
         f"options='-c client_encoding=UTF8'"
     )
+    print('DB_info:',psql_info)
     try:
         conn = psycopg2.connect(psql_info)
         conn.autocommit = True

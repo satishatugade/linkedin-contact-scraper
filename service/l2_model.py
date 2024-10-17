@@ -15,11 +15,7 @@ load_dotenv()
 def fetch_data_from_db():
     try:
         logger.log_message(f"Fetching data from the database", level='info')
-        db_params = DB.load_database_config()
-
-        if not all([db_params.get('dbname'), db_params.get('user'), db_params.get('password'), db_params.get('host'), db_params.get('port')]):
-            raise ValueError("Database credentials are missing from the configuration")
-        engine = create_engine(f"postgresql://{db_params['user']}:{db_params['password']}@{db_params['host']}:{db_params['port']}/{db_params['dbname']}")
+        engine = DB.load_database_config()
        
         query = "SELECT phrase, label, l1_category FROM l2_tags"
         df = pd.read_sql(query, engine)
