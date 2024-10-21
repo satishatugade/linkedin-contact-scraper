@@ -3,11 +3,11 @@ import pandas as pd
 from psycopg2 import sql
 import config.database_config as DB
 
-def excel_to_db_postgres(excel_file, db_params):
+def excel_to_db_postgres(excel_file):
     table_name = os.path.splitext(os.path.basename(excel_file))[0].lower()
     try:
        
-        conn = DB.database_connection(db_params)
+        conn = DB.database_connection()
         
         if conn is None:
             raise Exception("Failed to connect to the database. Please check the database parameters and connection.")

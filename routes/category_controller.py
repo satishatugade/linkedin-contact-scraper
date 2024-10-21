@@ -47,11 +47,11 @@ def fetch_categories():
         if not event_name or not event_desc:
             return jsonify({"error": "Both 'eventName' and 'eventDesc' are required."}), 400
 
-        result = grabL1Category(event_name, event_desc)
+        category = grabL1Category(event_name, event_desc)
 
         
         logger.log_message(f"Successfully predicted categories", level='info')
-        return jsonify({"message": "Prediction successful", "result": json.loads(result)}), 200
+        return jsonify({"message": "Prediction successful", "category": json.loads(category)}), 200
 
     except Exception as e:
         logger.log_message(f"Error during prediction: {str(e)}", level='error')

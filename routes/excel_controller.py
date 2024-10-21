@@ -26,18 +26,8 @@ def generate_taxonomy_database():
 
         l2_file_path = os.path.join(temp_dir, l2_file.filename)
         l2_file.save(l2_file_path)
-
-        
-        db_params = {
-            "dbname": os.getenv("DB_NAME"),
-            "user": os.getenv("DB_USER"),
-            "password": os.getenv("DB_PASSWORD"),
-            "host": os.getenv("DB_HOST"),
-            "port": os.getenv("DB_PORT")
-        }
-
-        excel_to_db_postgres(l1_file_path, db_params)
-        excel_to_db_postgres(l2_file_path, db_params)
+        excel_to_db_postgres(l1_file_path)
+        excel_to_db_postgres(l2_file_path)
 
         logger.log_message(f"Successfully processed L1 and L2 files", level='info')
 

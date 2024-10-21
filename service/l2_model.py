@@ -15,7 +15,7 @@ load_dotenv()
 def fetch_data_from_db():
     try:
         logger.log_message(f"Fetching data from the database", level='info')
-        engine = DB.load_database_config()
+        engine = DB.database_connection()
        
         query = "SELECT phrase, label, l1_category FROM l2_tags"
         df = pd.read_sql(query, engine)

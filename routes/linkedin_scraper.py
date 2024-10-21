@@ -1,4 +1,5 @@
 import utils.logging as logger
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -127,39 +128,53 @@ def is_login_successful(driver):
         logger.log_message(f"Login unsuccessful. Current URL: {driver.current_url}",level='error')
         return False
 
-def process_event_page(driver, wait, company_linkedin_url, sddh_id, scraping_mode):
+def process_event_page(company_linkedin_url, sddh_id, scraping_mode,session_id,li_at_value):
     """Process LinkedIn event page based on scraping mode."""
-    driver.get(company_linkedin_url.strip())
-    wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-    time.sleep(5)
-# linkedin_event_url
-    linkedin_link = None  
-    if click_attend_button(driver, wait):
-        linkedin_link = driver.current_url  
-        logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}",level='info')
+    print("inside process_event_page")
+    driver = webdriver.Chrome()
+    driver.maximize_window()
+    wait = WebDriverWait(driver, 30)
+    try:
+        driver.get("https://www.linkedin.com/")
+        driver.add_cookie({'name': 'JSESSIONID', 'value': session_id})
+        driver.add_cookie({'name': 'li_at', 'value': li_at_value})
+        driver.refresh()
+        time.sleep(5)
+        driver.get(company_linkedin_url.strip())
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        time.sleep(5)
+        linkedin_link = None  
+        logger.log_message(f"Logging in")
+        if click_attend_button(driver, wait):
+            linkedin_link = driver.current_url  
+            logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}",level='info')
 
-        # Try to click the 'Attendees' link and paginate through the attendees
-        if click_attendees_link(driver, wait):
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
-
-    else:
-        if click_attendees_link(driver, wait):
-            linkedin_link = driver.current_url  # Capture the current URL
-            logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}",level='info')
-
-            handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
+            # Try to click the 'Attendees' link and paginate through the attendees
+            if click_attendees_link(driver, wait):
+                handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
 
         else:
-            logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
-            
-            if click_show_all_events(driver, wait):
-                event_links = get_upcoming_event_links(driver, wait)
-                for event_link in event_links:
-                    linkedin_link = event_link
-                    logger.log_message(f"Processing upcoming event link: {event_link}",level='info')
-                    process_event_page(driver, wait, event_link, sddh_id, scraping_mode)
+            if click_attendees_link(driver, wait):
+                linkedin_link = driver.current_url  # Capture the current URL
+                logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}",level='info')
+
+                handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
+
             else:
-                logger.log_message(f"No upcoming events available.",level='info')
+                logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
+                
+                if click_show_all_events(driver, wait):
+                    event_links = get_upcoming_event_links(driver, wait)
+                    for event_link in event_links:
+                        linkedin_link = event_link
+                        logger.log_message(f"Processing upcoming event link: {event_link}",level='info')
+                        process_event_page(driver, wait, event_link, sddh_id, scraping_mode)
+                else:
+                    logger.log_message(f"No upcoming events available.",level='info')
+    except Exception as e:
+        logger.log_message(f"An error occurred: {str(e)}", level='error')
+    finally:
+        driver.quit()                  
 
 def click_attend_button(driver, wait):
     """Attempt to click the 'Attend' button."""
