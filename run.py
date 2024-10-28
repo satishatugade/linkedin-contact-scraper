@@ -8,7 +8,9 @@ from routes.excel_controller import excel_blueprint
 from routes.ocr_controller import ocr_blueprint
 # from routes.google_searching_controller import google_domain_search_blueprint
 from utils.logging import setup_logging
-
+from routes.google_based_searching import linkedin_bp
+from routes.google_based_searching import company_bp
+from routes.email_generator import email_generator_bp
 setup_logging()
 
 app = Flask(__name__)
@@ -21,6 +23,9 @@ app.register_blueprint(fetch_categories_blueprint)
 app.register_blueprint(contact_scraper_bp)
 app.register_blueprint(excel_blueprint)
 app.register_blueprint(ocr_blueprint)
+app.register_blueprint(linkedin_bp)
+app.register_blueprint(email_generator_bp)
+app.register_blueprint(company_bp)
 # app.register_blueprint(google_domain_search_blueprint)
 @app.route('/', methods=['GET'])
 def getHome():

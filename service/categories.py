@@ -20,15 +20,21 @@ def grabL2Category(eventDesc, L1Category):
     model_filepath = f'{model_filepath}\\logistic_regression_model_{L1Category}.pkl'
     vectorizer_filepath = f'{vectorizer_filepath}\\tfidf_vectorizer_{L1Category}.pkl'
 
-    loaded_model, loaded_vectorizer = load_model_and_vectorizer(model_filepath, vectorizer_filepath)
+    try:
+        loaded_model, loaded_vectorizer = load_model_and_vectorizer(model_filepath, vectorizer_filepath)
+        
+        if loaded_model is None or loaded_vectorizer is None:
+            return ""  # Return an empty string if the L2 model or vectorizer is not loaded
 
-    data = [eventDesc]
-    X_test_vect = loaded_vectorizer.transform(data)
-    predictions = loaded_model.predict(X_test_vect)
+        data = [eventDesc]
+        X_test_vect = loaded_vectorizer.transform(data)
+        predictions = loaded_model.predict(X_test_vect)
 
-    L2 = predictions[0]
-    return L2
-
+        L2 = predictions[0]
+        return L2  # Return the L2 prediction if the model is loaded correctly
+    except FileNotFoundError:
+        return ""
+    
 def grabL1Category(eventName, eventDesc):
     load_dotenv()
     model_filename = os.getenv('L1_MODEL_PATH', r'D:\Setup\pyTools\models\L1\L1_model.pkl')
