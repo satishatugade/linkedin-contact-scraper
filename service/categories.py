@@ -37,12 +37,13 @@ def grabL2Category(eventDesc, L1Category):
     
 def grabL1Category(eventName, eventDesc):
     load_dotenv()
-    model_filename = os.getenv('L1_MODEL_PATH', r'D:\Setup\pyTools\models\L1\L1_model.pkl')
-    vectorizer_filename = os.getenv('L1_VECTORIZER_PATH', r'D:\Setup\pyTools\models\L1\l1_vectorizer.pkl')
+    model_filename = os.getenv('L1_MODEL_PATH', r'D:\eventible-git\linkedin-contact-scraper\models\L1\L1_model.pkl')
+    vectorizer_filename = os.getenv('L1_VECTORIZER_PATH', r'D:\eventible-git\linkedin-contact-scraper\models\L1\l1_vectorizer.pkl')
 
     loaded_model, loaded_vectorizer = load_model_and_vectorizer(model_filename, vectorizer_filename)
-
-    data = [eventDesc]
+    
+    combined_input = f"{eventName} {eventDesc}"
+    data = [combined_input]
     X_test_vect = loaded_vectorizer.transform(data)
     y_pred = loaded_model.predict(X_test_vect)
 
