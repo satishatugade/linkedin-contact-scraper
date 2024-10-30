@@ -1,39 +1,33 @@
-import os
 import pandas as pd
+import psycopg2
 from psycopg2 import sql
-import config.database_config as DB
+import config.database_config as db
+import utils.logging as logger
 
-def excel_to_db_postgres(excel_file):
-    table_name = os.path.splitext(os.path.basename(excel_file))[0].lower()
-    try:
-       
-        conn = DB.database_connection()
-        
-        if conn is None:
-            raise Exception("Failed to connect to the database. Please check the database parameters and connection.")
+def excel_to_db_postgres(file, table_name):
+    """Processes and saves the uploaded Excel file to a specified database table."""
+    conn = db.database_connection()
+    cursor = conn.cursor()
 
-        cursor = conn.cursor()
-        sheets = pd.read_excel(excel_file, sheet_name=None)
-        df = pd.concat(sheets.values(), ignore_index=True)
+    sheets = pd.read_excel(file, sheet_name=None)
+    df = pd.concat(sheets.values(), ignore_index=True)
+    
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
-        drop_table_query = f"DROP TABLE IF EXISTS {table_name};"
-        cursor.execute(drop_table_query)
+    drop_table_query = sql.SQL("DROP TABLE IF EXISTS {}").format(sql.Identifier(table_name))
+    cursor.execute(drop_table_query)
 
-        df_columns = df.columns.tolist()
-        columns = ", ".join([f"{col} TEXT" for col in df_columns])
-        create_table_query = f"CREATE TABLE {table_name} ({columns});"
-        cursor.execute(create_table_query)
-        
-        for _, row in df.iterrows():
-            insert_query = sql.SQL("INSERT INTO {} VALUES ({})").format(
-                sql.Identifier(table_name),
-                sql.SQL(', ').join(map(sql.Literal, row))
-            )
-            cursor.execute(insert_query)
+    columns = ", ".join([f"{col} TEXT" for col in df.columns])
+    create_table_query = sql.SQL("CREATE TABLE {} ({})").format(sql.Identifier(table_name), sql.SQL(columns))
+    cursor.execute(create_table_query)
+    for _, row in df.iterrows():
+        insert_query = sql.SQL("INSERT INTO {} VALUES ({})").format(
+            sql.Identifier(table_name),
+            sql.SQL(',').join(map(sql.Literal, row))
+        )
+        cursor.execute(insert_query)
 
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-    except Exception as e:
-        raise Exception(f"Error processing file {excel_file}: {e}")
+    conn.commit()
+    cursor.close()
+    conn.close()
+    logger.log_message(f"Table {table_name} created and data inserted successfully.", level="info")
