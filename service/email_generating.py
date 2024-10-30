@@ -1,9 +1,16 @@
+import os
 import requests
 import psycopg2
 import config.database_config as db  # Reuse the existing database config
 import utils.logging as logger
+from dotenv import load_dotenv
 
-api_key = "87fc6ba5420f4eac3fa10713bcfbd9ef44494fa4"
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API key and URL from environment variables
+api_key = os.getenv("HUNTER_API_KEY")
+api_url = os.getenv("HUNTER_API_URL")
 
 def split_name(full_name):
     """Splits the full name into first and last name."""
@@ -18,7 +25,7 @@ def generate_email_and_update(first_name, last_name, domain, full_name, cursor, 
 
         for dom in domains:
             dom = dom.strip()  
-            url = f"https://api.hunter.io/v2/email-finder?domain={dom}&first_name={first_name}&last_name={last_name}&api_key={api_key}"
+            url = f"{api_url}?domain={dom}&first_name={first_name}&last_name={last_name}&api_key={api_key}"
             response = requests.get(url)
             data = response.json()
 
@@ -52,16 +59,6 @@ def generate_emails_for_contacts():
 
     cursor = conn.cursor()
 
-    # Manual test entries for demonstration (can be removed in production)
-    manual_entries = [
-        ("akshada kothavale", "catseyetech.in, example.com"),
-        ("shavez ansari", "catseyetech.in, example.org, example.net")
-    ]
-
-    for full_name, domain in manual_entries:
-        first_name, last_name = split_name(full_name)
-        generate_email_and_update(first_name, last_name, domain, full_name, cursor, conn)
-
     # Fetch contacts from the database and process them
     query = "SELECT contact_name, domain FROM uq_event_contact_info"
     cursor.execute(query)
@@ -73,4 +70,4 @@ def generate_emails_for_contacts():
     cursor.close()
     conn.close()
 
-    return {"status": "success", "message": "Email generation completed"}
+    return {"status": "success", "message": "Email generation started"}
