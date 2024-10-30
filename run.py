@@ -1,5 +1,6 @@
 from flask import Flask,jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
 from routes.category_controller import l2_model_blueprint
 from routes.category_controller import l1_model_blueprint
 from routes.category_controller import fetch_categories_blueprint
@@ -12,6 +13,7 @@ from routes.google_based_searching import linkedin_bp
 from routes.google_based_searching import company_bp
 from routes.email_generator import email_generator_bp
 setup_logging()
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)

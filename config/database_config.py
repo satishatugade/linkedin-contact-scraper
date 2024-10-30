@@ -1,10 +1,8 @@
 import os
-from dotenv import load_dotenv
 import psycopg2
 
 def load_database_config():
 
-    load_dotenv()
     host = os.getenv('DB_HOST', 'localhost')
     port = int(os.getenv('DB_PORT', 5432))
     username = os.getenv('DB_USERNAME', 'postgres')
