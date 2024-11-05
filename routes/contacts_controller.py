@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import utils.logging as logger
 # from concurrent.futures import ThreadPoolExecutor
 import threading
-from routes.linkedin_scraper import process_event_page, fetch_linkedin_url_dump_detail_table
+from routes.linkedin_scraper import process_event_page, fetch_linkedin_url_dump_detail_table,update_contact_scraping_status
 # from controllers.linkedin_scraper import process_event_page, getLinkFromContactInfo, fetch_sddh_by_id
 
 contact_scraper_bp = Blueprint('scraper', __name__)
@@ -27,11 +27,16 @@ def scrape_linkedin_atteendees_data():
 
     print(f"linkedin_url_list count : ",len(linkedin_url_list))
     logger.log_message(f"linkedin_url_list count : ",len(linkedin_url_list))
-
     for data in linkedin_url_list:
+        logger.log_message(f"Event Name In lower case :{data.event_name}")
+        status, scraping_status_id=update_contact_scraping_status(data.eds_id,sddh_id,scraping_mode,"InProgress",None)
+        if status == "success":
+            print(f"Data inserted successfully with ID: {scraping_status_id}")
+        else:
+            print("Failed to insert data.")
         threading.Thread(
         target=process_event_page,
-        args=(data.company_linkedin_url, sddh_id, scraping_mode, session_id, li_at_value)).start()
+        args=(data.company_linkedin_url,scraping_status_id,sddh_id,data.event_name, scraping_mode, session_id, li_at_value)).start()
     
     logger.log_message(f"Linkedin contact scraping started !",level='info')
     return jsonify({'message': 'Linkedin contact scraping started !'}), 200

@@ -11,16 +11,12 @@ from selenium.common.exceptions import ElementClickInterceptedException
 from config import database_config as DB
 
 
-# class ContactInfo:
-#     """Class to represent LinkedIn contact information."""
-#     def __init__(self, sddh_id, company_linkdin_link):
-#         self.sddh_id = sddh_id
-#         self.company_linkdin_link = company_linkdin_link
-
 class ContactInfo:
-    def __init__(self, sddh_id, company_linkedin_url, contact_name=None, occupation=None, profile_url=None, created_date=None, error_reason=None):
+    def __init__(self, sddh_id, company_linkedin_url,eds_id,event_name, contact_name=None, occupation=None, profile_url=None, created_date=None, error_reason=None):
         self.sddh_id = sddh_id
         self.company_linkedin_url = company_linkedin_url
+        self.eds_id=eds_id
+        self.event_name=event_name
         self.contact_name = contact_name
         self.occupation = occupation
         self.profile_url = profile_url
@@ -28,7 +24,7 @@ class ContactInfo:
         self.error_reason = error_reason
 
     def __str__(self):
-        return (f"ContactInfo(sddh_id={self.sddh_id}, company_linkedin_url={self.company_linkedin_url}, "
+        return (f"ContactInfo(sddh_id={self.sddh_id}, company_linkedin_url={self.company_linkedin_url},eds_id={self.eds_id},event_name={self.event_name} "
                 f"contact_name={self.contact_name}, occupation={self.occupation}, "
                 f"profile_url={self.profile_url}, created_date={self.created_date}, "
                 f"error_reason={self.error_reason})")    
@@ -36,28 +32,36 @@ class ContactInfo:
 def fetch_linkedin_url_dump_detail_table(sddh_id):
     logger.log_message(f"fetch_linkedin_url_dump_detail_table Event Id :",sddh_id)
     db_conn = DB.database_connection()
-    print('database :',db_conn)
     if not db_conn:
         print("Failed to connect to the database")
         return "failed"
     try:
         cursor = db_conn.cursor()
-        query = """SELECT uddd1.sddh_id, uddd1.datapoint_value AS linkedin_link
+        query = """SELECT uddd1.sddh_id,uddd1.datapoint_value AS linkedin_link,uds.id as eds_id,LOWER(uddd3.datapoint_value) AS event_name
                    FROM uq_data_dump_details uddd1
-                   JOIN uq_data_dump_details uddd2
-                   ON uddd1.sddh_id = uddd2.sddh_id
+                   JOIN 
+                        uq_data_dump_details uddd2 ON uddd1.sddh_id = uddd2.sddh_id
+                   JOIN 
+                        uq_data_dump_details uddd3 ON uddd1.sddh_id = uddd3.sddh_id     
+                    LEFT JOIN 
+                        uq_data_dump_header uddh ON uddd1.sddh_id = uddh.id
+                    LEFT JOIN 
+                        uq_project_data_source upds ON uddh.spds_id = upds.id
+                    LEFT JOIN 
+                        uq_project_result upr ON upds.sp_id = upr.id
+                    LEFT JOIN 
+                        uq_data_source uds ON upds.eds_id = uds.id
                    WHERE uddd1.datapoint_name = 'LinkedinURL'
                    AND uddd2.datapoint_name = 'LinkedInScrapingState'
+                   AND uddd3.datapoint_name = 'EventName'
                    AND uddd2.datapoint_value = 'false'"""
         if sddh_id != "":
             query += " AND uddd1.sddh_id = %s"
             cursor.execute(query, (sddh_id,))
         else:
             cursor.execute(query)
-        print('Query',query)
         results = cursor.fetchall()  
-        print("results ",results) 
-        contact_info_list = [ContactInfo(row[0], row[1]) for row in results]
+        contact_info_list = [ContactInfo(row[0], row[1],row[2],row[3]) for row in results]
         return contact_info_list
 
     except Exception as e:
@@ -66,7 +70,63 @@ def fetch_linkedin_url_dump_detail_table(sddh_id):
     finally:
         if db_conn:
             cursor.close()
-            db_conn.close()   
+            db_conn.close()  
+
+def update_contact_scraping_status(eds_id, sddh_id, scraping_mode, status, error_reason=None):
+    db_conn = DB.database_connection()
+    if not db_conn:
+        logger.log_message("Failed to connect to the database", level='info')
+        return "failed", None
+    
+    try:
+        with db_conn.cursor() as cursor:
+            insert_query = """
+            INSERT INTO uq_contact_scraping_status (eds_id, sddh_id, scraping_mode, status, error_reason)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+            """
+            cursor.execute(insert_query, (eds_id, sddh_id, scraping_mode, status, error_reason))
+            new_id = cursor.fetchone()[0]  # Retrieve the generated ID
+            db_conn.commit()  # Commit the transaction
+            logger.log_message("Data inserted successfully", level='info')
+            return "success", new_id
+    
+    except psycopg2.Error as e:
+        db_conn.rollback()  # Rollback in case of error
+        logger.log_message(f"Error saving data to PostgreSQL: {e}", level='info')
+        return "failed", None
+    
+    finally:
+        if db_conn:
+            db_conn.close()
+
+def update_contact_scraping_status_by_id(table_id, sddh_id, new_status, new_error_reason=None):
+    db_conn = DB.database_connection()
+    if not db_conn:
+        logger.log_message("Failed to connect to the database", level='info')
+        return "failed"
+    
+    try:
+        with db_conn.cursor() as cursor:
+            update_query = """
+            UPDATE uq_contact_scraping_status
+            SET status = %s, error_reason = %s
+            WHERE id = %s AND sddh_id = %s
+            """
+            cursor.execute(update_query, (new_status, new_error_reason, table_id, sddh_id))
+            db_conn.commit()  # Commit the transaction
+            logger.log_message("Data updated successfully", level='info')
+            return "success"
+    
+    except psycopg2.Error as e:
+        db_conn.rollback()  # Rollback in case of error
+        logger.log_message(f"Error updating data in PostgreSQL: {e}", level='info')
+        return "failed"
+    
+    finally:
+        if db_conn:
+            db_conn.close()
+
 
 def save_attendee_data(attendee):
     """Save scraped attendee data to the database."""
@@ -149,26 +209,26 @@ def is_login_successful(driver):
 #         time.sleep(5)
 #         linkedin_link = None  
 #         logger.log_message(f"Logging in")
-#         if click_attend_button(driver, wait):
+#         if click_attend_button(wait):
 #             linkedin_link = driver.current_url  
 #             logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}",level='info')
 
 #             # Try to click the 'Attendees' link and paginate through the attendees
-#             if click_attendees_link(driver, wait):
-#                 handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
+#             if click_attendees_link(wait):
+#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url)
 
 #         else:
-#             if click_attendees_link(driver, wait):
+#             if click_attendees_link(wait):
 #                 linkedin_link = driver.current_url  # Capture the current URL
 #                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}",level='info')
 
-#                 handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url)
+#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url)
 
 #             else:
 #                 logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
                 
 #                 if click_show_all_events(driver, wait):
-#                     event_links = get_upcoming_event_links(driver, wait)
+#                     event_links = get_upcoming_event_links(wait)
 #                     for event_link in event_links:
 #                         linkedin_link = event_link
 #                         logger.log_message(f"Processing upcoming event link: {event_link}",level='info')
@@ -178,8 +238,10 @@ def is_login_successful(driver):
 #     except Exception as e:
 #         logger.log_message(f"An error occurred: {str(e)}", level='error')
 #     finally:
-#         driver.quit()                  
-def process_event_page(company_linkedin_url, sddh_id, scraping_mode, session_id, li_at_value):
+#         driver.quit()   
+
+
+def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_name, scraping_mode, session_id, li_at_value):
     """Process LinkedIn event page based on scraping mode."""
     print("inside process_event_page")
     driver = webdriver.Chrome()
@@ -200,7 +262,7 @@ def process_event_page(company_linkedin_url, sddh_id, scraping_mode, session_id,
         if not is_login_successful(driver):
             error_reason = "Login failed."
             logger.log_message(f"Login failed. Exiting the process.", level='error')
-           
+            update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
             return
 
         # Step 3: Visit the company LinkedIn URL
@@ -210,36 +272,31 @@ def process_event_page(company_linkedin_url, sddh_id, scraping_mode, session_id,
         logger.log_message(f"Visiting company page: {company_linkedin_url}", level='info')
 
         # Step 4: Check for the "Attend" button
-        if click_attend_button(driver, wait):
+        if click_attend_button(wait):
             linkedin_link = driver.current_url
             logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}", level='info')
 
             # Try to click the 'Attendees' link and paginate through the attendees
-            if click_attendees_link(driver, wait):
-                handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
+            if click_attendees_link(wait):
+                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
             else:
                 error_reason = "Attendees link not found."
                 logger.log_message(f"Attendees link not found. Skipping pagination.", level='error')
-               
-
         else:
-            
             logger.log_message(f"Attend button not found. Checking for 'Attendees' link.", level='info')
-            
             # Step 5: If "Attend" button is not found, check for "Attendees" link
-            if click_attendees_link(driver, wait):
+            if click_attendees_link(wait):
                 linkedin_link = driver.current_url  # Capture the current URL
                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
 
-                handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
+                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
 
             else:
                 logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
                 
-
                 # Step 6: Check for "Show All Events" button
                 if click_show_all_events(driver, wait):
-                    event_links = get_upcoming_event_links(driver, wait)
+                    event_links = get_upcoming_event_links(wait)
 
                     if event_links:
                         logger.log_message(f"Found {len(event_links)} upcoming events.", level='info')
@@ -250,10 +307,15 @@ def process_event_page(company_linkedin_url, sddh_id, scraping_mode, session_id,
                             logger.log_message(f"Processing upcoming event link: {event_link}", level='info')
                             process_event_page(event_link, sddh_id, scraping_mode, session_id, li_at_value)
                     else:
+                        error_reason="No upcoming events available"
                         logger.log_message(f"No upcoming events available for URL: {company_linkedin_url}", level='info')
+                        update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
                         
                 else:
+                    error_reason="Show All Events button not found."
                     logger.log_message(f"Show All Events button not found for URL: {company_linkedin_url}", level='error')
+                    update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
+
                   
     except Exception as e:
         # Log and handle any unexpected errors
@@ -264,7 +326,7 @@ def process_event_page(company_linkedin_url, sddh_id, scraping_mode, session_id,
         driver.quit()
 
 
-def click_attend_button(driver, wait):
+def click_attend_button(wait):
     """Attempt to click the 'Attend' button."""
     logger.log_message(f"Attempting to click the 'Attend' button",level='info')
     try:
@@ -276,10 +338,10 @@ def click_attend_button(driver, wait):
         return True
     except Exception as e:
         error_reason = "Attend button not found."
-        logger.log_message(f"Attend button not found.",level='info')
+        logger.log_message(f"{error_reason}",level='info')
         return False
 
-def click_attendees_link(driver, wait):
+def click_attendees_link(wait):
     """Attempt to click the 'Attendees' link."""
     logger.log_message(f"Attempting to click the 'Attendees' link",level='info')
     try:
@@ -309,7 +371,8 @@ def click_show_all_events(driver, wait):
     except Exception as e:
         logger.log_message(f"Failed to click 'Show all events' button: {e}", level='error')
         return False
-def get_upcoming_event_links(driver, wait):
+    
+def get_upcoming_event_links(wait):
     """Fetch upcoming event links."""
     logger.log_message(f"Fetching upcoming event links",level='info')
     try:
@@ -351,7 +414,8 @@ def take_screenshot_of_elements(driver, sddh_id, page_count, folder_path, screen
     driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
     time.sleep(9)  
     take_screenshot(driver, sddh_id, page_count, folder_path, screenshot_type)
-def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link, company_linkedin_url, error_reason):
+    
+def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason):
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.", level='info')
     page_count = 1
@@ -396,7 +460,9 @@ def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link, compa
                         "source": scraping_mode,
                         "error_reason": error_reason
                     }
-                    save_attendee_data(attendee)
+                    save_status=save_attendee_data(attendee)
+                    if save_status =="success":
+                        update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)  
                     break
 
             except Exception as e:
@@ -485,7 +551,7 @@ def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link, compa
                 save_attendee_data(attendee)
                 break
 
-# def handle_pagination(driver, wait, sddh_id, scraping_mode, linkedin_link,company_linkedin_url,error_reason):
+# def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url,error_reason):
 #     """Handle pagination for OCR or Selenium mode."""
 #     logger.log_message(f"Handling pagination with {scraping_mode} mode.",level='info')
 #     page_count = 1

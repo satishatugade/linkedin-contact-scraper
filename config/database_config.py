@@ -24,7 +24,6 @@ def database_connection():
         f"password={config['password']} dbname={config['dbname']} "
         f"options='-c client_encoding=UTF8'"
     )
-    print('DB_info:',psql_info)
     try:
         conn = psycopg2.connect(psql_info)
         conn.autocommit = True
