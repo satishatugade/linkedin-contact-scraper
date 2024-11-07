@@ -7,7 +7,6 @@ from routes.category_controller import fetch_categories_blueprint
 from routes.contacts_controller import contact_scraper_bp
 from routes.excel_controller import excel_blueprint
 from routes.ocr_controller import ocr_blueprint
-# from routes.google_searching_controller import google_domain_search_blueprint
 from utils.logging import setup_logging
 from routes.google_based_searching import linkedin_bp
 from routes.google_based_searching import company_bp
@@ -17,8 +16,6 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-# app = create_app()
-
 app.register_blueprint(l2_model_blueprint)
 app.register_blueprint(l1_model_blueprint)
 app.register_blueprint(fetch_categories_blueprint)
@@ -28,7 +25,6 @@ app.register_blueprint(ocr_blueprint)
 app.register_blueprint(linkedin_bp)
 app.register_blueprint(email_generator_bp)
 app.register_blueprint(company_bp)
-# app.register_blueprint(google_domain_search_blueprint)
 @app.route('/', methods=['GET'])
 def getHome():
     return {"message": "Contacts server is running..."}

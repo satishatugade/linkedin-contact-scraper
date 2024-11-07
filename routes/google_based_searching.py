@@ -1,18 +1,16 @@
 from flask import Blueprint,request, jsonify
 from config.database_config import database_connection
 from service.google_fetching_linkedin_profile import process_contacts
-from service.domain_name_searching import process_company_data
+from routes.email_generator import fetch_email_data
+from service.domain import process_company_data
 import utils.logging as logger
 import requests
 import os
-import http.client
-import json
 
 linkedin_bp = Blueprint('linkedin_profileurl_google', __name__)
 
 @linkedin_bp.route('/api/fetch-profile-data', methods=['POST'])
 def scrape_linkedin_profiles():
-    # Establish database connection
     db_connection = database_connection()
     
     if not db_connection:
@@ -52,7 +50,6 @@ def process_companies():
     try:
         data = request.get_json()
         sddh_id= data.get("sddh_id")
-        # Call the function to process company data
         result = process_company_data(sddh_id)
 
         if result:
@@ -68,32 +65,47 @@ def process_companies():
         logger.log_message(f"Error processing companies: {str(e)}", level="error")
         return jsonify({"status": "error", "message": str(e)}), 500
     
+def fetch_company_domain(company_name):
+    """Fetch company domain and logo from Clearbit API."""
+    try:
+        CLEARBIT_API_KEY = os.getenv('CLEARBIT_API_KEY')
+        CLEARBIT_API_URL = os.getenv('CLEARBIT_API_URL')
+        headers = {'Authorization': f'Bearer {CLEARBIT_API_KEY}'}
+        api_url = f'{CLEARBIT_API_URL}{company_name}'
+
+        response = requests.get(api_url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {"domain": data.get("domain"), "logo": data.get("logo")}, None
+        else:
+            error = response.json().get("error")
+            return None, error
+
+    except Exception as e:
+        return None, {"message": str(e), "type": "Exception occurs"}
+
 @company_bp.route('/api/get-domain', methods=['POST'])
 def get_domain_data():
     try:
         data = request.get_json()
-        CLEARBIT_API_KEY = os.getenv('CLEARBIT_API_KEY')
-        CLEARBIT_API_URL = os.getenv('CLEARBIT_API_URL')
         company_name = data.get('company_name')
-        headers = {'Authorization': f'Bearer {CLEARBIT_API_KEY}'}
-    
-        api_url = f'{CLEARBIT_API_URL}{company_name}'
-        response = requests.get(api_url, headers=headers)
-                
-        if response.status_code == 200:
-            response=response.json()
-            return jsonify({"data":{"domain":response.get("domain"),"logo":response.get("logo")},"error":None}),200
+        result, error = fetch_company_domain(company_name)
+        if error:
+            return jsonify({"data": None, "error": error}), 400
         else:
-            response=response.json()
-            return jsonify({"data":None,"error":response.get("error")}),400
+            return jsonify({"data": result, "error": None}), 200
+
     except Exception as e:
         print(e)
-        return jsonify({"data":None,"error":{"message":f"{e}","type":f"Exception occurs"}}),500
-    
+        return jsonify({"data": None, "error": {"message": str(e), "type": "Exception occurs"}}), 500
+
 @company_bp.route('/api/get-company-info', methods=['POST'])
 def get_company_info():
     data = request.get_json()
     profile_url = data.get('profile_url')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
     api_key = os.getenv('SCRAPIN_API_KEY')
     url = os.getenv('SCRAPIN_API_URL')
 
@@ -114,11 +126,28 @@ def get_company_info():
         company_data = response_data.get('company', {})
         industry = company_data.get('industry')
 
+        first_position = positions[0] if positions else {}
+        company_name = first_position.get("companyName")
+
+        domain_info, error = fetch_company_domain(company_name) if company_name else (None, None)
+        if error:
+            logger.log_message(f"Clearbit fetch domain having error : {error}")
+
+        domain = domain_info.get("domain") if domain_info else ""
+        if domain:
+            email_result, email_error = fetch_email_data(domain, first_name, last_name)
+            if email_error:
+                logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+            email = email_result.get("data", {}).get("email") if email_result else ""
+        else:
+            email_result = None
         first_position = {
             "company_location": positions[0].get("companyLocation"),
             "company_logo": positions[0].get("companyLogo"),
             "company_name": positions[0].get("companyName"),
-            "industry": industry
+            "industry": industry,
+            "domain": domain,
+            "email": email
         } if positions else {}
 
         return jsonify({"data": first_position,"scrapin_api_dump": response_data })

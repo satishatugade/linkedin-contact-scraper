@@ -1,14 +1,10 @@
 import os
 import requests
-import psycopg2
 import config.database_config as db  # Reuse the existing database config
 import utils.logging as logger
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
 load_dotenv()
 
-# Get API key and URL from environment variables
 api_key = os.getenv("HUNTER_API_KEY")
 api_url = os.getenv("HUNTER_API_URL")
 
@@ -59,7 +55,6 @@ def generate_emails_for_contacts():
 
     cursor = conn.cursor()
 
-    # Fetch contacts from the database and process them
     query = "SELECT contact_name, domain FROM uq_event_contact_info"
     cursor.execute(query)
 

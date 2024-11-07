@@ -3,7 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from service.domain_name_searching import process_company_data
+from service.domain import process_company_data
 import time
 import os
 import psycopg2
