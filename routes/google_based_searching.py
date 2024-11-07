@@ -89,3 +89,39 @@ def get_domain_data():
     except Exception as e:
         print(e)
         return jsonify({"data":None,"error":{"message":f"{e}","type":f"Exception occurs"}}),500
+    
+@company_bp.route('/api/get-company-info', methods=['POST'])
+def get_company_info():
+    data = request.get_json()
+    profile_url = data.get('profile_url')
+    api_key = os.getenv('SCRAPIN_API_KEY')
+    url = os.getenv('SCRAPIN_API_URL')
+
+    if not profile_url:
+        return jsonify({"error": "Profile url parameter are required"}), 400
+
+    querystring = {
+        "apikey": api_key,
+        "linkedInUrl": profile_url
+    }
+
+    try:
+        response = requests.get(url, params=querystring)
+        response.raise_for_status() 
+        response_data  = response.json() 
+        person_data = response_data.get('person', {})
+        positions = person_data.get('positions', {}).get('positionHistory', [])
+        company_data = response_data.get('company', {})
+        industry = company_data.get('industry')
+
+        first_position = {
+            "company_location": positions[0].get("companyLocation"),
+            "company_logo": positions[0].get("companyLogo"),
+            "company_name": positions[0].get("companyName"),
+            "industry": industry
+        } if positions else {}
+
+        return jsonify({"data": first_position,"scrapin_api_dump": response_data })
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
