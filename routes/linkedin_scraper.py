@@ -3,6 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from service.domain_name_searching import process_company_data
 import time
 import os
 import psycopg2
@@ -30,7 +31,7 @@ class ContactInfo:
                 f"error_reason={self.error_reason})")    
           
 def fetch_linkedin_url_dump_detail_table(sddh_id):
-    logger.log_message(f"fetch_linkedin_url_dump_detail_table Event Id :",sddh_id)
+    logger.log_message(f"fetch_linkedin_url_dump_detail_table Event Id :{sddh_id}")
     db_conn = DB.database_connection()
     if not db_conn:
         print("Failed to connect to the database")
@@ -279,6 +280,9 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
             # Try to click the 'Attendees' link and paginate through the attendees
             if click_attendees_link(wait):
                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
+                print("after handle pagination google search")
+                process_company_data(sddh_id)
+                update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 error_reason = "Attendees link not found."
                 logger.log_message(f"Attendees link not found. Skipping pagination.", level='error')
@@ -290,7 +294,9 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
 
                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
-
+                print("after handle pagination google search")
+                process_company_data(sddh_id)
+                update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
                 
@@ -452,6 +458,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                     page_count += 1
                 except Exception as e:
                     logger.log_message(f"No more pages or error clicking next button: {str(e)}. Pagination ended.", level='info')
+                    process_company_data(sddh_id)
                     error_reason = f"Pagination ended or error: {str(e)}"
                     attendee = {
                         "sddh_id": sddh_id,
@@ -527,6 +534,8 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                     time.sleep(6)
                 except Exception as e:
                     error_reason = f"No more pages or error clicking next button: {str(e)}"
+                    process_company_data(sddh_id)
+                    update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
                     logger.log_message(error_reason, level='info')
                     attendee = {
                         "sddh_id": sddh_id,

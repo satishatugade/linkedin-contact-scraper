@@ -5,6 +5,8 @@ from service.domain_name_searching import process_company_data
 import utils.logging as logger
 import requests
 import os
+import http.client
+import json
 
 linkedin_bp = Blueprint('linkedin_profileurl_google', __name__)
 
@@ -48,8 +50,10 @@ def process_companies():
     logger.log_message("Received request to process companies", level="info")
 
     try:
+        data = request.get_json()
+        sddh_id= data.get("sddh_id")
         # Call the function to process company data
-        result = process_company_data()
+        result = process_company_data(sddh_id)
 
         if result:
             message = "Successfully processed company data."

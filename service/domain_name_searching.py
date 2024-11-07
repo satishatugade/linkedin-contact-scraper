@@ -57,7 +57,7 @@ def search_company_workspace(driver, name, max_links=3):
         logger.log_message(f"Error occurred while searching for {name}: {str(e)}", level="error")
         return None
 
-def process_company_data():
+def process_company_data(sddh_id):
     """Processes the company data and updates the database with domain information."""
     logger.log_message("Started processing company data", level="info")
 
@@ -68,10 +68,12 @@ def process_company_data():
         return
 
     # SQL query to fetch contacts without domain
-    fetch_query = "SELECT id, contact_name FROM uq_event_contact_info WHERE domain IS NULL"
+    # fetch_query = "SELECT id, contact_name FROM uq_event_contact_info WHERE domain IS NULL"
+    fetch_query = "SELECT id, contact_name FROM uq_event_contact_info WHERE domain IS NULL AND sddh_id = %s"
 
     try:
-        df = pd.read_sql(fetch_query, conn)
+        # df = pd.read_sql(fetch_query, conn)
+        df = pd.read_sql(fetch_query, conn, params=(sddh_id,))
         logger.log_message(f"Fetched {len(df)} contacts from the database", level="info")
     except Exception as e:
         logger.log_message(f"Failed to fetch contacts from the database: {str(e)}", level="error")

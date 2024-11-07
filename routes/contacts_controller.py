@@ -26,7 +26,7 @@ def scrape_linkedin_atteendees_data():
         return jsonify({'error': 'Linkedin links not found'}), 500
 
     print(f"linkedin_url_list count : ",len(linkedin_url_list))
-    logger.log_message(f"linkedin_url_list count : ",len(linkedin_url_list))
+    logger.log_message(f"linkedin_url_list count : {len(linkedin_url_list)}")
     for data in linkedin_url_list:
         logger.log_message(f"Event Name In lower case :{data.event_name}")
         status, scraping_status_id=update_contact_scraping_status(data.eds_id,sddh_id,scraping_mode,"InProgress",None)
