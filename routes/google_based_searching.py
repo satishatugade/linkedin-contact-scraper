@@ -3,9 +3,17 @@ from config.database_config import database_connection
 from service.google_fetching_linkedin_profile import process_contacts
 from routes.email_generator import fetch_email_data
 from service.domain import process_company_data
+from utils.logging import log_message
 import utils.logging as logger
 import requests
 import os
+import traceback
+import tldextract
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+import time
+from googlesearch import search
+
 
 linkedin_bp = Blueprint('linkedin_profileurl_google', __name__)
 
@@ -99,58 +107,216 @@ def get_domain_data():
     except Exception as e:
         print(e)
         return jsonify({"data": None, "error": {"message": str(e), "type": "Exception occurs"}}), 500
+    
 
-@company_bp.route('/api/get-company-info', methods=['POST'])
+def extract_root_domain(url):
+    try:
+        extracted = tldextract.extract(url)
+        root_domain = f"{extracted.domain}.{extracted.suffix}"
+        return root_domain
+    except Exception as e:
+        print(f"Error extracting domain: {e}")
+        logger.log_message(f"Error extracting domain: {e}")
+        return None    
+
+def fetch_company_data_with_scrapin_api(profile_url):
+    api_key = os.getenv('SCRAPIN_API_KEY')
+    url = os.getenv('SCRAPIN_API_URL')
+    querystring = {
+        "apikey": api_key,
+        "linkedInUrl": profile_url
+    }
+    response = requests.get(url, params=querystring)
+    response.raise_for_status() 
+    response_data  = response.json() 
+    return response_data
+
+@company_bp.route('/api/get-profile-info', methods=['POST'])
 def get_company_info():
     data = request.get_json()
     profile_url = data.get('profile_url')
     first_name = data.get('first_name')
     last_name = data.get('last_name')
-    api_key = os.getenv('SCRAPIN_API_KEY')
-    url = os.getenv('SCRAPIN_API_URL')
 
     if not profile_url:
         return jsonify({"error": "Profile url parameter are required"}), 400
 
-    querystring = {
-        "apikey": api_key,
-        "linkedInUrl": profile_url
-    }
-
-    try:
-        response = requests.get(url, params=querystring)
-        response.raise_for_status() 
-        response_data  = response.json() 
-        person_data = response_data.get('person', {})
-        positions = person_data.get('positions', {}).get('positionHistory', [])
-        company_data = response_data.get('company', {})
-        industry = company_data.get('industry')
-
-        first_position = positions[0] if positions else {}
-        company_name = first_position.get("companyName")
-
-        domain_info, error = fetch_company_domain(company_name) if company_name else (None, None)
-        if error:
-            logger.log_message(f"Clearbit fetch domain having error : {error}")
-
-        domain = domain_info.get("domain") if domain_info else ""
-        if domain:
-            email_result, email_error = fetch_email_data(domain, first_name, last_name)
+    profile_data=get_linkedin_profile(profile_url)
+    # location = profile_data["city"]
+    profile_image = profile_data["profileImage"]
+    company_name = profile_data["companyName"]
+    company_url = profile_data["companyDetails"]["url"]
+    if company_url !="":
+        try:
+            scraping_domain=extract_root_domain(company_url)
+        except Exception as e:
+            scraping_domain = "" 
+            logger.log_message(f"Exception caught: {e}")
+        if scraping_domain:
+            logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
+            email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
             if email_error:
                 logger.log_message(f"Hunter fetch email of person having error : {email_error}")
-            email = email_result.get("data", {}).get("email") if email_result else ""
-        else:
-            email_result = None
-        first_position = {
-            "company_location": positions[0].get("companyLocation"),
-            "company_logo": positions[0].get("companyLogo"),
-            "company_name": positions[0].get("companyName"),
-            "industry": industry,
-            "domain": domain,
-            "email": email
-        } if positions else {}
+            email = email_result.get("data", {}).get("email") if email_result else ""    
+        data = {
+                "company_location": "",
+                "company_logo": "",
+                "company_name": company_name,
+                "industry": "",
+                "domain": "",
+                "scrapin_domain":scraping_domain,
+                "email": email,
+                "profile_image": profile_image
+        } 
+        return jsonify({"data": data,"scrapin_api_dump": None })
+    else:        
+        try:
+            response_data=fetch_company_data_with_scrapin_api(profile_url)
+            person_data = response_data.get('person', {})
+            positions = person_data.get('positions', {}).get('positionHistory', [])
+            company_data = response_data.get('company', {})
+            industry = company_data.get('industry')
+            websiteUrl = company_data.get('websiteUrl')
+            try:
+                scraping_domain=extract_root_domain(websiteUrl)
+            except Exception as e:
+                scraping_domain = "" 
+                logger.log_message(f"Exception caught: {e}")    
 
-        return jsonify({"data": first_position,"scrapin_api_dump": response_data })
+            first_position = positions[0] if positions else {}
+            company_name = first_position.get("companyName")
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+            domain_info, error = fetch_company_domain(company_name) if company_name else (None, None)
+            if error:
+                logger.log_message(f"Clearbit fetch domain having error : {error}")
+
+            domain = domain_info.get("domain") if domain_info else ""
+            if scraping_domain:
+                logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
+                email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
+                if email_error:
+                    logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+                email = email_result.get("data", {}).get("email") if email_result else ""
+            else:
+                logger.log_message(f"Clearbit domain use for hunter api to find email {domain}")
+                email_result, email_error = fetch_email_data(domain, first_name, last_name)
+                if email_error:
+                    logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+                email = email_result.get("data", {}).get("email") if email_result else ""
+
+            first_position = {
+                "company_location": positions[0].get("companyLocation"),
+                "company_logo": positions[0].get("companyLogo"),
+                "company_name": positions[0].get("companyName"),
+                "industry": industry,
+                "domain": domain,
+                "scrapin_domain":scraping_domain,
+                "email": email,
+                "profile_image": ""
+            } if positions else {}
+
+            return jsonify({"data": first_position,"scrapin_api_dump": response_data })
+
+        except requests.exceptions.RequestException as e:
+            stack_trace = traceback.format_exc()
+            logger.log_message(f"Scrapin api exception occures : {stack_trace}")   
+            return jsonify({"error": str(e)}), 500
+
+ 
+def getCompanyDomain(company):
+    try:
+        query=f"{company} website"
+        results=search(query, advanced=True)
+        results_list = list(results)
+        logger.log_message(f"Company google search results: {results_list[0]}",level="info")   
+        return results_list[0]
+    except Exception as e:
+        logger.log_message(f"Exception while getting Company info {e}",level="error")   
+        return None
+   
+
+def get_linkedin_profile(linkedInURL):
+    try:
+        options = Options()
+        options.add_argument("--incognito")
+        driver = webdriver.Chrome(options=options)
+        try:
+            driver.get(linkedInURL)
+            driver.maximize_window()
+            time.sleep(15)
+            company = name = headline = companyDetails=city= profileImage= None
+            try:
+                company = driver.execute_script(
+                    "return document.getElementsByClassName('top-card-link__description')[0].innerText;"
+                )
+                if company is not None:
+                    res=getCompanyDomain(company)
+                    companyDetails=res
+                company=company
+            except Exception as e:
+                logger.log_message(f"Exception when getting Company Name {e}",level="error")   
+            
+            try:
+                name = driver.execute_script("return document.getElementsByClassName('top-card-layout__title')[0].innerText")
+                name=name
+            except Exception as e:
+                logger.log_message(f"Exception when getting Name {e}",level="error")   
+            
+            try:
+                headline=driver.execute_script("return document.getElementsByClassName('top-card-layout__headline')[0].innerText")
+                headline=headline
+            except Exception as e:
+                logger.log_message(f"Exception when getting about {e}",level="error")
+            
+            try:
+                city=driver.execute_script("return document.querySelector('.not-first-middot span').innerText;")
+                city=city
+            except Exception as e:
+                logger.log_message(f"Exception when getting city {e}",level="error")
+            
+            try:
+                profileImage=driver.execute_script("return document.querySelector('.top-card__profile-image').src;")
+                profileImage=profileImage
+            except Exception as e:
+                logger.log_message(f"Exception when getting profile image {e}",level="error")
+                
+            
+            info={  
+                "companyDetails":{
+                        "url":companyDetails.url,
+                        "description":companyDetails.description,
+                        "title":companyDetails.title
+                    } if companyDetails else None,
+                "companyName":company,
+                "name":name,
+                "city":city,
+                "profileImage":profileImage,
+                "headline":headline
+                }
+            logger.log_message(f"LinkedIn profile info: {info}",level="info")
+            return info
+        
+        except Exception as e:
+            logger.log_message(f"Error while loading linkedin Profile: {e}",level="error")
+            return None
+        finally:
+            driver.quit()
+    except Exception as e:
+        logger.log_message(message=f"",level="error")
+        return None
+
+
+
+@company_bp.route('/api/get-linkedin-profile',methods=['POST'])
+def getLinkedinProfile():
+    try:
+        data=request.json
+        if not data:
+            return jsonify({"error": "Invalid JSON format"}), 400
+        if 'profile_url' not in data:
+            return jsonify({"data":None,"error":"profile_url is required"})
+        info=get_linkedin_profile(data['profile_url'])
+        return jsonify({"data":info})
+    except Exception as e:
+        return jsonify({"data":None,"error":f"Exception occured while searching link {e}"}),500
+
