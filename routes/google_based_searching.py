@@ -140,89 +140,91 @@ def get_company_info():
 
     if not profile_url:
         return jsonify({"error": "Profile url parameter are required"}), 400
+    # try:
+    #     profile_data=get_linkedin_profile(profile_url)
+    #     # location = profile_data["city"]
+    #     profile_image = profile_data["profileImage"]
+    #     company_name = profile_data["companyName"]
+    #     company_url = profile_data["companyDetails"]["url"]
+    #     if company_url !="":
+    #         try:
+    #             scraping_domain=extract_root_domain(company_url)
+    #         except Exception as e:
+    #             scraping_domain = "" 
+    #             logger.log_message(f"Exception caught: {e}")
+    #         if scraping_domain:
+    #             logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
+    #             email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
+    #             if email_error:
+    #                 logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+    #             email = email_result.get("data", {}).get("email") if email_result else ""    
+    #         data = {
+    #                 "company_location": "",
+    #                 "company_logo": "",
+    #                 "company_name": company_name,
+    #                 "industry": "",
+    #                 "domain": "",
+    #                 "scrapin_domain":scraping_domain,
+    #                 "email": email,
+    #                 "profile_image": profile_image
+    #         } 
+    #         return jsonify({"data": data,"scrapin_api_dump": None })
+    # except requests.exceptions.RequestException as e:
+    #         stack_trace = traceback.format_exc()
+    #         logger.log_message(f"Profile scrape exception occures stack_trace : {stack_trace}")        
+    #         logger.log_message(f"Profile scrape exception occures object : {e}")        
+
     try:
-        profile_data=get_linkedin_profile(profile_url)
-        # location = profile_data["city"]
-        profile_image = profile_data["profileImage"]
-        company_name = profile_data["companyName"]
-        company_url = profile_data["companyDetails"]["url"]
-        if company_url !="":
-            try:
-                scraping_domain=extract_root_domain(company_url)
-            except Exception as e:
-                scraping_domain = "" 
-                logger.log_message(f"Exception caught: {e}")
-            if scraping_domain:
-                logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
-                email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
-                if email_error:
-                    logger.log_message(f"Hunter fetch email of person having error : {email_error}")
-                email = email_result.get("data", {}).get("email") if email_result else ""    
-            data = {
-                    "company_location": "",
-                    "company_logo": "",
-                    "company_name": company_name,
-                    "industry": "",
-                    "domain": "",
-                    "scrapin_domain":scraping_domain,
-                    "email": email,
-                    "profile_image": profile_image
-            } 
-            return jsonify({"data": data,"scrapin_api_dump": None })
+        response_data=fetch_company_data_with_scrapin_api(profile_url)
+        person_data = response_data.get('person', {})
+        positions = person_data.get('positions', {}).get('positionHistory', [])
+        company_data = response_data.get('company', {})
+        industry = company_data.get('industry')
+        websiteUrl = company_data.get('websiteUrl')
+        try:
+            scraping_domain=extract_root_domain(websiteUrl)
+        except Exception as e:
+            scraping_domain = "" 
+            logger.log_message(f"Exception caught: {e}")    
+
+        first_position = positions[0] if positions else {}
+        company_name = first_position.get("companyName")
+
+        domain_info, error = fetch_company_domain(company_name) if company_name else (None, None)
+        if error:
+            logger.log_message(f"Clearbit fetch domain having error : {error}")
+
+        domain = domain_info.get("domain") if domain_info else ""
+        if scraping_domain:
+            logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
+            email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
+            if email_error:
+                logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+            email = email_result.get("data", {}).get("email") if email_result else ""
+        else:
+            logger.log_message(f"Clearbit domain use for hunter api to find email {domain}")
+            email_result, email_error = fetch_email_data(domain, first_name, last_name)
+            if email_error:
+                logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+            email = email_result.get("data", {}).get("email") if email_result else ""
+
+        first_position = {
+            "company_location": positions[0].get("companyLocation"),
+            "company_logo": positions[0].get("companyLogo"),
+            "company_name": positions[0].get("companyName"),
+            "industry": industry,
+            "domain": domain,
+            "scrapin_domain":scraping_domain,
+            "email": email,
+            "profile_image": ""
+        } if positions else {}
+
+        return jsonify({"data": first_position,"scrapin_api_dump": response_data })
+
     except requests.exceptions.RequestException as e:
-            stack_trace = traceback.format_exc()
-            logger.log_message(f"Profile scrape exception occures : {stack_trace}")        
-            try:
-                response_data=fetch_company_data_with_scrapin_api(profile_url)
-                person_data = response_data.get('person', {})
-                positions = person_data.get('positions', {}).get('positionHistory', [])
-                company_data = response_data.get('company', {})
-                industry = company_data.get('industry')
-                websiteUrl = company_data.get('websiteUrl')
-                try:
-                    scraping_domain=extract_root_domain(websiteUrl)
-                except Exception as e:
-                    scraping_domain = "" 
-                    logger.log_message(f"Exception caught: {e}")    
-
-                first_position = positions[0] if positions else {}
-                company_name = first_position.get("companyName")
-
-                domain_info, error = fetch_company_domain(company_name) if company_name else (None, None)
-                if error:
-                    logger.log_message(f"Clearbit fetch domain having error : {error}")
-
-                domain = domain_info.get("domain") if domain_info else ""
-                if scraping_domain:
-                    logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
-                    email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
-                    if email_error:
-                        logger.log_message(f"Hunter fetch email of person having error : {email_error}")
-                    email = email_result.get("data", {}).get("email") if email_result else ""
-                else:
-                    logger.log_message(f"Clearbit domain use for hunter api to find email {domain}")
-                    email_result, email_error = fetch_email_data(domain, first_name, last_name)
-                    if email_error:
-                        logger.log_message(f"Hunter fetch email of person having error : {email_error}")
-                    email = email_result.get("data", {}).get("email") if email_result else ""
-
-                first_position = {
-                    "company_location": positions[0].get("companyLocation"),
-                    "company_logo": positions[0].get("companyLogo"),
-                    "company_name": positions[0].get("companyName"),
-                    "industry": industry,
-                    "domain": domain,
-                    "scrapin_domain":scraping_domain,
-                    "email": email,
-                    "profile_image": ""
-                } if positions else {}
-
-                return jsonify({"data": first_position,"scrapin_api_dump": response_data })
-
-            except requests.exceptions.RequestException as e:
-                stack_trace = traceback.format_exc()
-                logger.log_message(f"Scrapin api exception occures : {stack_trace}")   
-                return jsonify({"error": str(e)}), 500
+        stack_trace = traceback.format_exc()
+        logger.log_message(f"Scrapin api exception occures : {stack_trace}")   
+        return jsonify({"error": str(e)}), 500
 
  
 def getCompanyDomain(company):
