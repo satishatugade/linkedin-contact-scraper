@@ -195,11 +195,13 @@ def get_company_info():
             logger.log_message(f"Clearbit fetch domain having error : {error}")
 
         domain = domain_info.get("domain") if domain_info else ""
-        if domain:
-            logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}")
-            email_result, email_error = fetch_email_data(domain, first_name, last_name)
+        if scraping_domain:
+            logger.log_message(f"Scrapin domain use for hunter api to find email {scraping_domain}: {first_name} : {last_name}")
+
+            email_result, email_error = fetch_email_data(scraping_domain, first_name, last_name)
             if email_error:
                 logger.log_message(f"Hunter fetch email of person having error : {email_error}")
+            logger.log_message(f"Email data : {email_result}")
             email = email_result.get("data", {}).get("email") if email_result else ""
         else:
             logger.log_message(f"Clearbit domain use for hunter api to find email {domain}")
