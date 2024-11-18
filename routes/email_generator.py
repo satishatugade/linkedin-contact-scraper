@@ -3,6 +3,9 @@ from flask import Blueprint, jsonify,request
 import requests
 import os
 from service.email_generating import generate_emails_for_contacts
+from service.domain import fetch_company_domain
+from utils.logging import log_message
+
 
 email_generator_bp = Blueprint('email_generator', __name__)
 
@@ -37,12 +40,25 @@ def fetch_email_data(domain, first_name, last_name):
 
 @email_generator_bp.route('/api/get-email-data', methods=['POST'])
 def get_email_data_info():
-    data = request.get_json()
-    domain = data.get('domain')
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
-    result, error = fetch_email_data(domain, first_name, last_name)
-    if error:
-        return jsonify({"error": error}), error.get("status_code", 500)
-    else:
-        return jsonify(result), 200
+
+    try:
+        data = request.get_json()
+        # domain = data.get('domain')
+        log_message(level='info',message=f"Input request forget_email_data_info : {data}")
+        company_name = data.get('company_name')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+
+        clearbit_response, error = fetch_company_domain(company_name)
+        log_message(level='info',message=f"clearbit_response {clearbit_response}")
+        if error:
+            log_message(level='error',message=f"Error in fetch company domain :{error}")
+        else:
+            result, error = fetch_email_data(clearbit_response.get('domain'), first_name, last_name)
+            result["data"]["company_logo"] =clearbit_response.get('logo')
+            if error:
+                return jsonify({"error": error}), error.get("status_code", 500)
+            else:
+                return jsonify(result), 200
+    except Exception as e:
+        log_message(level='error',message=f"Error in fetch email info api :{e}")

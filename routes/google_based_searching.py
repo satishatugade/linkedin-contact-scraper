@@ -3,6 +3,7 @@ from config.database_config import database_connection
 from service.google_fetching_linkedin_profile import process_contacts
 from routes.email_generator import fetch_email_data
 from service.domain import process_company_data
+from service.domain import fetch_company_domain
 from utils.logging import log_message
 import utils.logging as logger
 import requests
@@ -72,27 +73,7 @@ def process_companies():
     except Exception as e:
         logger.log_message(f"Error processing companies: {str(e)}", level="error")
         return jsonify({"status": "error", "message": str(e)}), 500
-    
-def fetch_company_domain(company_name):
-    """Fetch company domain and logo from Clearbit API."""
-    try:
-        CLEARBIT_API_KEY = os.getenv('CLEARBIT_API_KEY')
-        CLEARBIT_API_URL = os.getenv('CLEARBIT_API_URL')
-        headers = {'Authorization': f'Bearer {CLEARBIT_API_KEY}'}
-        api_url = f'{CLEARBIT_API_URL}{company_name}'
-
-        response = requests.get(api_url, headers=headers)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {"domain": data.get("domain"), "logo": data.get("logo")}, None
-        else:
-            error = response.json().get("error")
-            return None, error
-
-    except Exception as e:
-        return None, {"message": str(e), "type": "Exception occurs"}
-
+  
 @company_bp.route('/api/get-domain', methods=['POST'])
 def get_domain_data():
     try:
@@ -137,7 +118,7 @@ def get_company_info():
     profile_url = data.get('profile_url')
     first_name = data.get('first_name')
     last_name = data.get('last_name')
-
+    logger.log_message(f"Request data to fetch profile info {data}")    
     if not profile_url:
         return jsonify({"error": "Profile url parameter are required"}), 400
     # try:

@@ -9,7 +9,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from urllib.parse import urlparse
 import config.database_config as db  # Importing the unchanged database_config file
 from sqlalchemy import text
-import utils.logging as logger  # Custom logger
+import utils.logging as logger 
+import os
+import requests
 
 def initialize_driver():
     """Initializes the WebDriver for scraping."""
@@ -112,3 +114,24 @@ def process_company_data(sddh_id):
     conn.close()
     logger.log_message("Database connection closed", level="info")
     return {"processed": processed}
+
+  
+def fetch_company_domain(company_name):
+    """Fetch company domain and logo from Clearbit API."""
+    try:
+        CLEARBIT_API_KEY = os.getenv('CLEARBIT_API_KEY')
+        CLEARBIT_API_URL = os.getenv('CLEARBIT_API_URL')
+        headers = {'Authorization': f'Bearer {CLEARBIT_API_KEY}'}
+        api_url = f'{CLEARBIT_API_URL}{company_name}'
+
+        response = requests.get(api_url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {"domain": data.get("domain"), "logo": data.get("logo")}, None
+        else:
+            error = response.json().get("error")
+            return None, error
+
+    except Exception as e:
+        return None, {"message": str(e), "type": "Exception occurs"}
