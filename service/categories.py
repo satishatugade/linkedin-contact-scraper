@@ -2,6 +2,7 @@ import pickle
 import json
 from dotenv import load_dotenv
 import os
+import utils.logging as logger 
 
 def load_model_and_vectorizer(model_path, vectorizer_path):
     with open(model_path, 'rb') as model_file:
@@ -13,9 +14,8 @@ def load_model_and_vectorizer(model_path, vectorizer_path):
     return loaded_model, loaded_vectorizer
 
 def grabL2Category(eventDesc, L1Category):
-    load_dotenv()
-    model_filepath = os.getenv('L2_MODEL_PATH', r'D:\Setup\pyTools\models\L2')
-    vectorizer_filepath = os.getenv('L2_VECTORIZER_PATH', r'D:\Setup\pyTools\models\L2')
+    model_filepath = os.getenv('L2_MODEL_PATH')
+    vectorizer_filepath = os.getenv('L2_VECTORIZER_PATH')
 
     model_filepath = f'{model_filepath}\\logistic_regression_model_{L1Category}.pkl'
     vectorizer_filepath = f'{vectorizer_filepath}\\tfidf_vectorizer_{L1Category}.pkl'
@@ -24,6 +24,7 @@ def grabL2Category(eventDesc, L1Category):
         loaded_model, loaded_vectorizer = load_model_and_vectorizer(model_filepath, vectorizer_filepath)
         
         if loaded_model is None or loaded_vectorizer is None:
+            logger.log_message(level="info",message="L2 model or vectorizer is not loaded")
             return ""  # Return an empty string if the L2 model or vectorizer is not loaded
 
         data = [eventDesc]
@@ -33,6 +34,7 @@ def grabL2Category(eventDesc, L1Category):
         L2 = predictions[0]
         return L2  # Return the L2 prediction if the model is loaded correctly
     except FileNotFoundError:
+        logger.log_message(level="info",message="File Not Found Error")
         return ""
     
 def grabL1Category(eventName, eventDesc):

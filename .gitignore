@@ -12,6 +12,7 @@ __pycache__/
 # Ignore environment variables file
 .env
 
+/env/
 # Ignore screenshots directory
 screenshots/
 logs/

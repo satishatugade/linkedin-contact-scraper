@@ -6,8 +6,8 @@ def load_database_config():
     host = os.getenv('DB_HOST', 'localhost')
     port = int(os.getenv('DB_PORT', 5432))
     username = os.getenv('DB_USERNAME', 'postgres')
-    password = os.getenv('DB_PASSWORD', '123456789')
-    dbname = os.getenv('DB_NAME', 'uq_eventible')
+    password = os.getenv('DB_PASSWORD', 'root')
+    dbname = os.getenv('DB_NAME', 'eventible')
 
     return {
         'host': host,
