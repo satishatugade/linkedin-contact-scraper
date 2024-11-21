@@ -58,6 +58,8 @@ def get_email_data_info():
             result, error = fetch_email_data(clearbit_response.get('domain'), first_name, last_name)
             result["data"]["company_logo"] =clearbit_response.get('logo')
             result["data"]["domain"] =clearbit_response.get('domain')
+            result["data"]["first_name"]=first_name
+            result["data"]["last_name"]=last_name
             if error:
                 return jsonify({"error": error,"data":{"first_name":first_name,"last_name":last_name,"domain":None,"email":None}}), error.get("status_code", 500)
             else:
