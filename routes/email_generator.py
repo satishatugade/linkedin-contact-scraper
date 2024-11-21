@@ -51,14 +51,17 @@ def get_email_data_info():
 
         clearbit_response, error = fetch_company_domain(company_name)
         log_message(level='info',message=f"clearbit_response {clearbit_response}")
-        if error:
+        if error:            
             log_message(level='error',message=f"Error in fetch company domain :{error}")
+            return jsonify({"error": error,"data":{"first_name":first_name,"last_name":last_name,"domain":None,"email":None}}), 400
         else:
             result, error = fetch_email_data(clearbit_response.get('domain'), first_name, last_name)
             result["data"]["company_logo"] =clearbit_response.get('logo')
+            result["data"]["domain"] =clearbit_response.get('domain')
             if error:
-                return jsonify({"error": error}), error.get("status_code", 500)
+                return jsonify({"error": error,"data":{"first_name":first_name,"last_name":last_name,"domain":None,"email":None}}), error.get("status_code", 500)
             else:
                 return jsonify(result), 200
     except Exception as e:
         log_message(level='error',message=f"Error in fetch email info api :{e}")
+        return jsonify({"error": {"message": f"Error in fetch email info api :{e}","type": "Exception"},"data":{"first_name":first_name,"last_name":last_name,"domain":None,"email":None}}),500
