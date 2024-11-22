@@ -50,7 +50,7 @@ def bulk_insert_l1(data):
         with db.database_connection() as conn:
             with conn.cursor() as cur:
                 query = """
-                    INSERT INTO l1_tags_temp (phrase, label)
+                    INSERT INTO l1_tags (phrase, label)
                     VALUES (%s, %s)
                     ON CONFLICT DO NOTHING
                 """
@@ -80,7 +80,7 @@ def bulk_insert_l2(data):
         with db.database_connection() as conn:
             with conn.cursor() as cur:
                 query = """
-                    INSERT INTO l2_tags_temp (phrase, label, l1_category)
+                    INSERT INTO l2_tags (phrase, label, l1_category)
                     VALUES (%s, %s,%s)
                     ON CONFLICT DO NOTHING
                 """
