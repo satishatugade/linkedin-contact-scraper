@@ -3,11 +3,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from service.domain import process_company_data
 import time
 import os
 import psycopg2
 from selenium.common.exceptions import ElementClickInterceptedException
+import datetime
 # from config.database_config as config
 from config import database_config as DB
 
@@ -74,6 +74,8 @@ def fetch_linkedin_url_dump_detail_table(sddh_id):
             db_conn.close()  
 
 def update_contact_scraping_status(eds_id, sddh_id, scraping_mode, status, error_reason=None):
+    start_time = datetime.datetime.now()
+    formatted_start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
     db_conn = DB.database_connection()
     if not db_conn:
         logger.log_message("Failed to connect to the database", level='info')
@@ -82,11 +84,11 @@ def update_contact_scraping_status(eds_id, sddh_id, scraping_mode, status, error
     try:
         with db_conn.cursor() as cursor:
             insert_query = """
-            INSERT INTO uq_contact_scraping_status (eds_id, sddh_id, scraping_mode, status, error_reason)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO uq_contact_scraping_status (eds_id, sddh_id,start_time, scraping_mode, status, error_reason)
+            VALUES (%s,%s, %s, %s, %s, %s)
             RETURNING id
             """
-            cursor.execute(insert_query, (eds_id, sddh_id, scraping_mode, status, error_reason))
+            cursor.execute(insert_query, (eds_id, sddh_id,formatted_start_time, scraping_mode, status, error_reason))
             new_id = cursor.fetchone()[0]  # Retrieve the generated ID
             db_conn.commit()  # Commit the transaction
             logger.log_message("Data inserted successfully", level='info')
@@ -102,6 +104,8 @@ def update_contact_scraping_status(eds_id, sddh_id, scraping_mode, status, error
             db_conn.close()
 
 def update_contact_scraping_status_by_id(table_id, sddh_id, new_status, new_error_reason=None):
+    end_time = datetime.datetime.now()
+    formatted_end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
     db_conn = DB.database_connection()
     if not db_conn:
         logger.log_message("Failed to connect to the database", level='info')
@@ -109,18 +113,14 @@ def update_contact_scraping_status_by_id(table_id, sddh_id, new_status, new_erro
     
     try:
         with db_conn.cursor() as cursor:
-            update_query = """
-            UPDATE uq_contact_scraping_status
-            SET status = %s, error_reason = %s
-            WHERE id = %s AND sddh_id = %s
-            """
-            cursor.execute(update_query, (new_status, new_error_reason, table_id, sddh_id))
-            db_conn.commit()  # Commit the transaction
-            logger.log_message("Data updated successfully", level='info')
+            update_query = """ UPDATE uq_contact_scraping_status SET status = %s,end_time =%s,error_reason = %s WHERE id = %s AND sddh_id = %s"""
+            cursor.execute(update_query, (new_status,formatted_end_time, new_error_reason, table_id, sddh_id))
+            db_conn.commit() 
+            logger.log_message("Status updated successfully", level='info')
             return "success"
     
     except psycopg2.Error as e:
-        db_conn.rollback()  # Rollback in case of error
+        db_conn.rollback()
         logger.log_message(f"Error updating data in PostgreSQL: {e}", level='info')
         return "failed"
     
@@ -139,8 +139,8 @@ def save_attendee_data(attendee):
     try:
         with db_conn.cursor() as cursor:
             insert_query = """
-            INSERT INTO uq_event_contact_info (sddh_id, contact_name, occupation, location, profile_url, linkedin_link, company_linkedin_url, source, error_reason)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO uq_event_contact_info (sddh_id, contact_name, occupation, location, profile_url, linkedin_link, company_linkedin_url, source, error_reason,profile_image)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
             """
             cursor.execute(insert_query, (
                 attendee['sddh_id'],
@@ -148,10 +148,11 @@ def save_attendee_data(attendee):
                 attendee['occupation'],
                 attendee['location'],
                 attendee['profile_url'],
-                attendee['linkedin_link'],  # Now saving the linkedin_url
-                attendee['company_linkedin_url'],    # Company URL
-                attendee['source'],         # Scraping mode (selenium or ocr)
-                attendee['error_reason']    # Error reason if any
+                attendee['linkedin_link'], 
+                attendee['company_linkedin_url'], 
+                attendee['source'],        
+                attendee['error_reason'],
+                attendee['profile_image']  
             ))
 
             update_scraping_state_query = """
@@ -190,66 +191,14 @@ def is_login_successful(driver):
         logger.log_message(f"Login unsuccessful. Current URL: {driver.current_url}",level='error')
         return False
 
-# def process_event_page(company_linkedin_url, sddh_id, scraping_mode,session_id,li_at_value):
-#     """Process LinkedIn event page based on scraping mode."""
-#     print("inside process_event_page")
-#     driver = webdriver.Chrome()
-#     driver.maximize_window()
-#     wait = WebDriverWait(driver, 30)
-#     try:
-#         driver.get("https://www.linkedin.com/")
-#         driver.add_cookie({'name': 'JSESSIONID', 'value': session_id})
-#         driver.add_cookie({'name': 'li_at', 'value': li_at_value})
-#         driver.refresh()
-#         time.sleep(10)
-#         if not is_login_successful(driver, wait):
-#             logger.log_message(f"Login failed. Exiting the process.", level='error')
-#             return  
-#         driver.get(company_linkedin_url.strip())
-#         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-#         time.sleep(5)
-#         linkedin_link = None  
-#         logger.log_message(f"Logging in")
-#         if click_attend_button(wait):
-#             linkedin_link = driver.current_url  
-#             logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}",level='info')
-
-#             # Try to click the 'Attendees' link and paginate through the attendees
-#             if click_attendees_link(wait):
-#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url)
-
-#         else:
-#             if click_attendees_link(wait):
-#                 linkedin_link = driver.current_url  # Capture the current URL
-#                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}",level='info')
-
-#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url)
-
-#             else:
-#                 logger.log_message(f"Neither Attend button nor Attendees link found. Checking for upcoming events.",level='info')
-                
-#                 if click_show_all_events(driver, wait):
-#                     event_links = get_upcoming_event_links(wait)
-#                     for event_link in event_links:
-#                         linkedin_link = event_link
-#                         logger.log_message(f"Processing upcoming event link: {event_link}",level='info')
-#                         process_event_page(driver, wait, event_link, sddh_id, scraping_mode)
-#                 else:
-#                     logger.log_message(f"No upcoming events available.",level='info')
-#     except Exception as e:
-#         logger.log_message(f"An error occurred: {str(e)}", level='error')
-#     finally:
-#         driver.quit()   
-
-
 def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_name, scraping_mode, session_id, li_at_value):
     """Process LinkedIn event page based on scraping mode."""
-    print("inside process_event_page")
+    logger.log_message(f"inside process_event_page",level='info')
     driver = webdriver.Chrome()
     driver.maximize_window()
     wait = WebDriverWait(driver, 30)
-    linkedin_link = None  # Initialize to None in case it isn't found
-    error_reason = None  # Initialize for storing error reasons
+    linkedin_link = None  
+    error_reason = None 
 
     try:
         # Step 1: Login to LinkedIn
@@ -280,8 +229,6 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
             # Try to click the 'Attendees' link and paginate through the attendees
             if click_attendees_link(wait):
                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
-                print("after handle pagination google search")
-                process_company_data(sddh_id)
                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 error_reason = "Attendees link not found."
@@ -290,12 +237,9 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
             logger.log_message(f"Attend button not found. Checking for 'Attendees' link.", level='info')
             # Step 5: If "Attend" button is not found, check for "Attendees" link
             if click_attendees_link(wait):
-                linkedin_link = driver.current_url  # Capture the current URL
+                linkedin_link = driver.current_url
                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
-
                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
-                print("after handle pagination google search")
-                process_company_data(sddh_id)
                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
@@ -321,11 +265,9 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
                     error_reason="Show All Events button not found."
                     logger.log_message(f"Show All Events button not found for URL: {company_linkedin_url}", level='error')
                     update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
-
-                  
+          
     except Exception as e:
-        # Log and handle any unexpected errors
-        logger.log_message(f"An error occurred: {str(e)}", level='error')
+        logger.log_message(f"An error occurred while visiting linkedin link: {str(e)}", level='error')
         error_reason = str(e)
         
     finally:
@@ -425,11 +367,11 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.", level='info')
     page_count = 1
-    folder_name = f"{sddh_id}"
-    folder_path = os.path.join(os.getcwd(), "screenshots", folder_name)
-    os.makedirs(folder_path, exist_ok=True)
 
     if scraping_mode == 'ocr':
+        folder_name = f"{sddh_id}"
+        folder_path = os.path.join(os.getcwd(), "screenshots", folder_name)
+        os.makedirs(folder_path, exist_ok=True)
         # OCR Mode: Take screenshots of each page.
         while True:
             try:
@@ -458,7 +400,6 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                     page_count += 1
                 except Exception as e:
                     logger.log_message(f"No more pages or error clicking next button: {str(e)}. Pagination ended.", level='info')
-                    process_company_data(sddh_id)
                     error_reason = f"Pagination ended or error: {str(e)}"
                     attendee = {
                         "sddh_id": sddh_id,
@@ -486,40 +427,52 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 break
 
     elif scraping_mode == 'selenium':
-        # Selenium Mode: Scrape attendee data
         while True:
             try:
                 reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "reusable-search__entity-result-list")))
-                attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "reusable-search__result-container")
+                # attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "reusable-search__result-container")
+                attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "ZFLZRoMHutorsdsBqUnDzqdxGyqQwCkbfAWzw")
                 for attendee_element in attendee_elements:
                     try:
                         name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
                     except Exception as e:
                         name = "LinkedIn Member"
+                        logger.log_message(f"Exception occured not getting x path for contact name", level='error')
                     try:
                         location = attendee_element.find_element(By.CLASS_NAME, "entity-result__secondary-subtitle").text
                     except Exception as e:
                         location = "Unknown Location"
+                        logger.log_message(f"Exception occured not getting x path for location : {e}", level='error')
                     try:
-                        occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
+                        # occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
+                        occupation = attendee_element.find_element(By.CLASS_NAME, "SzGzGXOjhlSxBLZREYXHQcmesGktYIsGbwt").text
                     except Exception as e:
                         occupation = "Unknown Occupation"
+                        logger.log_message(f"Exception occured not getting x path for occupation : {e}", level='error')
                     try:
-                        profile_url = attendee_element.find_element(By.CSS_SELECTOR, "a.app-aware-link").get_attribute("href")
+                        # occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
+                        profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
+                    except Exception as e:
+                        profile_image = ""   
+                        logger.log_message(f"Exception occured not getting x path for profile_image : {e}", level='error') 
+                    try:
+                        # profile_url = attendee_element.find_element(By.CSS_SELECTOR, "a.app-aware-link").get_attribute("href")
+                        profile_url = attendee_element.find_element(By.CLASS_NAME, "JTJydmASbTYtnYqLfPYAKInueMDRqsilJLNI").get_attribute("href")
                     except Exception as e:
                         profile_url = "Unknown Profile URL"
+                        logger.log_message(f"Exception occured not getting x path for profile_url : {e}", level='error')
 
-                    # Save attendee data for each element with error_reason field
                     attendee = {
                         "sddh_id": sddh_id,
                         "name": name,
                         "location": location,
                         "occupation": occupation,
                         "profile_url": profile_url,
-                        "linkedin_link": linkedin_link,  # Save the LinkedIn URL
-                        "company_linkedin_url": company_linkedin_url,  # Save the company URL
-                        "source": scraping_mode,  # Save scraping mode (selenium or ocr)
-                        "error_reason": error_reason # No error here
+                        "profile_image": profile_image,
+                        "linkedin_link": linkedin_link, 
+                        "company_linkedin_url": company_linkedin_url,  
+                        "source": scraping_mode, 
+                        "error_reason": error_reason 
                     }
                     save_attendee_data(attendee)
 
@@ -531,12 +484,12 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 try:
                     next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
                     next_button.click()
+                    print("next button clicked page_count ",page_count)
                     time.sleep(6)
                 except Exception as e:
                     error_reason = f"No more pages or error clicking next button: {str(e)}"
-                    process_company_data(sddh_id)
                     update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
-                    logger.log_message(error_reason, level='info')
+                    logger.log_message(error_reason, level='error')
                     attendee = {
                         "sddh_id": sddh_id,
                         "linkedin_link": linkedin_link,
@@ -559,123 +512,6 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 }
                 save_attendee_data(attendee)
                 break
-
-# def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link,company_linkedin_url,error_reason):
-#     """Handle pagination for OCR or Selenium mode."""
-#     logger.log_message(f"Handling pagination with {scraping_mode} mode.",level='info')
-#     page_count = 1
-#     folder_name = f"{sddh_id}"
-#     folder_path = os.path.join(os.getcwd(), "screenshots", folder_name)
-#     os.makedirs(folder_path, exist_ok=True)
-
-#     if scraping_mode == 'ocr':
-#         # OCR Mode: Take screenshots of each page.
-#         while True:
-#             try:
-#                 reusable_search_result_list = wait.until(
-#                 EC.presence_of_element_located((By.CLASS_NAME, "reusable-search__entity-result-list")))
-
-#             # Get the first 5 elements from the search result list
-#                 list_items = driver.find_elements(By.CSS_SELECTOR, "li.reusable-search__result-container")
-
-#                 if len(list_items) < 5:
-#                    logger.log_message("Less than 5 items found. Adjusting logic.",level='info')
-      
-#                 logger.log_message("Taking screenshot of the first 5 elements before scroll.",level='info')
-#                 take_screenshot_of_elements(driver, sddh_id, page_count, folder_path, "before_scroll", list_items[:5])
-#                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-#                 time.sleep(3)  
-#                 logger.log_message("Taking screenshot of the next 5 elements after scroll.",level='info')
-#                 take_screenshot_of_elements(driver, sddh_id, page_count, folder_path, "after_scroll", list_items[5:10])
-
-#                 # Check if there is a "next" button to go to the next page
-#                 try:
-#                     next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
-#                     next_button.click()
-#                     time.sleep(6)
-#                     page_count += 1
-#                 except Exception as e:
-#                     logger.log_message("No more pages or error clicking next button. Pagination ended.",level='info')
-#                     break
-
-#             except Exception as e:
-#                 logger.log_message(f"Error during OCR pagination: {e}",level='error')
-#                 break
-#             #     reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "reusable-search__entity-result-list")))
-#             #     take_screenshot(driver, sddh_id, page_count, folder_path, "before_scroll")
-#             #     time.sleep(10)
-#             #     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-#             #     time.sleep(3)
-#             #     take_screenshot(driver, sddh_id, page_count, folder_path, "after_scroll")
-
-#             #     try:
-#             #         next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
-#             #         next_button.click()
-#             #         time.sleep(6)
-#             #         page_count += 1
-#             #     except Exception as e:
-#             #         logger.log_message(f"No more pages or error clicking next button. Pagination ended.",level='info')
-#             #         break
-#             # except Exception as e:
-#             #     logger.log_message(f"Error during OCR pagination: {e}",level='error')
-#             #     break
-
-#     elif scraping_mode == 'selenium':
-#         # Selenium Mode: Scrape attendee data
-#         while True:
-#             try:
-#                 reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "reusable-search__entity-result-list")))
-#                 attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "reusable-search__result-container")
-#                 for attendee_element in attendee_elements:
-#                         try:
-#                             name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
-#                             print(name)
-#                         except Exception as e:
-#                             name = "LinkedIn Member"
-#                         try:
-#                             location = attendee_element.find_element(By.CLASS_NAME, "entity-result__secondary-subtitle").text
-#                             print(location)
-#                         except Exception as e:
-#                             location = "Unknown Location"
-#                         try:
-#                             occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
-#                             print(occupation)
-#                         except Exception as e:
-#                             occupation = "Unknown Occupation"
-#                         try:
-#                             profile_url = attendee_element.find_element(By.CSS_SELECTOR, "a.app-aware-link").get_attribute("href")
-#                             print(profile_url)
-#                         except Exception as e:
-#                             profile_url = "Unknown Profile URL"
-                
-#                 attendee = {
-#                         "sddh_id": sddh_id,
-#                         "name": name,
-#                         "location": location,
-#                         "occupation": occupation,
-#                         "profile_url": profile_url,
-#                         "linkedin_link": linkedin_link,  # Save the LinkedIn URL
-#                         "company_linkedin_url": company_linkedin_url,    # Save the company URL
-#                         "source": scraping_mode,       # Save scraping mode (selenium or ocr)
-#                         "error_reason": ""
-#                     }
-#                 save_attendee_data(attendee)
-
-#                 page_count += 1
-
-#                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-#                 time.sleep(3)  
-#                 try:
-#                     next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
-#                     next_button.click()
-#                     time.sleep(6)
-#                 except Exception as e:
-#                     print("No more pages or error clicking next button")
-#                     break
-
-#             except Exception as e:
-#                 print(f"Error scraping attendees: {e}")
-#                 break
 
 def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
     """Take a screenshot for OCR-based processing with correct naming."""
