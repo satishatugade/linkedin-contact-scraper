@@ -18,6 +18,8 @@ screenshots/
 logs/
 models/
 
+test.py
+/temp/
 # Ignore Python bytecode files
 __pycache__/
 *.pyc

@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from service.excel_processor import excel_to_db_postgres
+from service.excel_processor import excel_to_db_postgres, process_l1_tags, process_l2_tags
 import utils.logging as logger
 import os
 from dotenv import load_dotenv
@@ -26,12 +26,12 @@ def generate_taxonomy_database():
 
         l2_file_path = os.path.join(temp_dir, l2_file.filename)
         l2_file.save(l2_file_path)
-        excel_to_db_postgres(l1_file_path,'l1_tags')
-        excel_to_db_postgres(l2_file_path,'l2_tags')
 
-        logger.log_message(f"Successfully processed L1 and L2 files", level='info')
-
-        return jsonify({"message": "Both L1 and L2 Excel files processed successfully"}), 200
+        resultL1 = process_l1_tags(l1_file_path)
+        resultL2 = process_l2_tags(l2_file_path)
+        if resultL1['error'] is None and resultL2['error'] is None:
+            return jsonify({"message": "L1 and L2 Tags bulk uploaded","error":None}), 200
+        return jsonify({"message": "Error uploading taxonomy","error":f"Error L1: {resultL1['error']} L2: {resultL2['error']}"}), 500
 
     except Exception as e:
         logger.log_message(f"Error processing Excel files", level='error', error=str(e))

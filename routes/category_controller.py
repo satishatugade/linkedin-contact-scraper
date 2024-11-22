@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 import json
-from service.categories import grabL1Category 
+from service.categories import classify_event, grabL1Category 
 import utils.logging as logger 
 from service.l1_model import train_l1_model  
 from service.l2_model import train_l2_models 
@@ -55,3 +55,18 @@ def fetch_categories():
     except Exception as e:
         logger.log_message(f"Error during prediction: {str(e)}", level='error')
         return jsonify({"error": str(e)}), 500
+
+@fetch_categories_blueprint.route('/api/classify', methods=['POST'])
+def classify():
+    try:
+        data = request.get_json()
+        description = data.get("text", "")
+
+        if not description:
+            return jsonify({"error": "Description is required"}), 400
+        
+        l1_tag, l2_tags = classify_event(description)
+        return jsonify({"data":{"l1_tag": l1_tag,"l2_tags": l2_tags},"error":None })
+    except Exception as e:
+        logger.log_message(message=f"Exception while getting L1/L2 tags {e}", level="error")
+        return jsonify({"data":None,"error":f"Exception while getting L1/L2 tags {e}" })
