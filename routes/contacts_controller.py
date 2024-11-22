@@ -23,17 +23,19 @@ def scrape_linkedin_atteendees_data():
     linkedin_url_list = fetch_linkedin_url_dump_detail_table(sddh_id)
     if linkedin_url_list == "failed":
         logger.log_message("Failed to retrieve LinkedIn links from the database",level='info')
-        return jsonify({'error': 'Linkedin links not found'}), 500
+        return jsonify({'error': 'Linkedin links not found !'}), 500
+    if len(linkedin_url_list)==0:
+        logger.log_message("Failed to retrieve LinkedIn links from the database",level='info')
+        return jsonify({'error': 'Linkedin link already scrape. please reset scraping flag !'}), 409
 
-    print(f"linkedin_url_list count : ",len(linkedin_url_list))
     logger.log_message(f"linkedin_url_list count : {len(linkedin_url_list)}")
     for data in linkedin_url_list:
         logger.log_message(f"Event Name In lower case :{data.event_name}")
         status, scraping_status_id=update_contact_scraping_status(data.eds_id,sddh_id,scraping_mode,"InProgress",None)
         if status == "success":
-            print(f"Data inserted successfully with ID: {scraping_status_id}")
+            print(f"Status updated in table: {scraping_status_id}")
         else:
-            print("Failed to insert data.")
+            print("Failed to update status in database")
         threading.Thread(
         target=process_event_page,
         args=(data.company_linkedin_url,scraping_status_id,sddh_id,data.event_name, scraping_mode, session_id, li_at_value)).start()
