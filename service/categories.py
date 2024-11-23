@@ -81,24 +81,38 @@ l2_embeddings = precompute_embeddings(l2_tags.keys())
 
 def classify_event(description):
     description_embedding = model.encode(description)
-    # Level 1 matching: Find best match for Level 1 tags
+    # Level 1 matching: Find the best match for Level 1 tags
     level_1_tag = None
     level_1_score = 0
-    l1_reson=""
+    l1_reason = ""
     for keyword, tag_embedding in l1_embeddings.items():
         score = cosine_similarity([description_embedding], [tag_embedding])[0][0]
         if score > level_1_score:
             level_1_score = score
             level_1_tag = l1_tags[keyword]
-            
-    # Level 2 matching: Find best match for Level 2 tags
-    level_2_tags = []
+            l1_reason = keyword
+
+    # Filter L2 tags based on the chosen L1 tag
+    filtered_l2_tags = {
+        keyword: tags
+        for keyword, tags in l2_tags.items()
+        if level_1_tag in tags
+    }
+    # Level 2 matching: Find the best match for Level 2 tags
+    level_2_tag = None
     level_2_score = 0
-    for keyword, tags in l2_tags.items():
+    l2_reason = ""
+    for keyword, tags in filtered_l2_tags.items():
         score = cosine_similarity([description_embedding], [l2_embeddings[keyword]])[0][0]
         if score > level_2_score:
             level_2_score = score
-            level_2_tags = tags
+            level_2_tag = tags
+            l2_reason = keyword
 
-    return level_1_tag, level_2_tags
+    return {
+        "level_1_tag": level_1_tag,
+        "level_2_tag": level_2_tag,
+        "level_1_reason": l1_reason,
+        "level_2_reason": l2_reason
+    }
 
