@@ -5,9 +5,21 @@ import os
 import utils.logging as logger 
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-from utils.constants import l1_tags,l2_tags
+from utils.constants import l1_tags,l2_tags,stopwords
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def get_contributing_features(vectorizer, input_vect):
+    feature_names = vectorizer.get_feature_names_out()
+    non_zero_indices = input_vect.nonzero()[1]
+    feature_contributions = [(feature_names[idx], input_vect[0, idx]) for idx in non_zero_indices]
+    sorted_contributions = sorted(feature_contributions, key=lambda x: x[1], reverse=True)
+    return sorted_contributions
+
+def remove_stopwords(text):
+    words = text.split()
+    filtered_words = [word for word in words if word.lower() not in stopwords]
+    return ' '.join(filtered_words)
 
 def load_model_and_vectorizer(model_path, vectorizer_path):
     with open(model_path, 'rb') as model_file:
@@ -50,18 +62,24 @@ def grabL1Category(eventName, eventDesc):
     load_dotenv()
     model_filename = os.getenv('L1_MODEL_PATH', r'D:\eventible-git\linkedin-contact-scraper\models\L1\L1_model.pkl')
     vectorizer_filename = os.getenv('L1_VECTORIZER_PATH', r'D:\eventible-git\linkedin-contact-scraper\models\L1\l1_vectorizer.pkl')
-
+    eventName=remove_stopwords(eventName)
+    eventDesc=remove_stopwords(eventDesc)
     loaded_model, loaded_vectorizer = load_model_and_vectorizer(model_filename, vectorizer_filename)
     
-    combined_input = f"{eventName} {eventDesc}"
+    combined_input = f"{eventName} {eventDesc}".lower().replace(" the ","").replace(" a ","").replace(" to ","").replace(" of ","").replace(" a ","").replace(" an ","").replace(" in ","").replace(" and ","")
+    logger.log_message(message=f"combined_input : {combined_input}",level="info")
     data = [combined_input]
     X_test_vect = loaded_vectorizer.transform(data)
     y_pred = loaded_model.predict(X_test_vect)
 
+    contributions = get_contributing_features(loaded_vectorizer, X_test_vect)
+    for word, score in contributions:
+        logger.log_message(level="info", message=f"Word: {word}, Score: {score}")
+    
     feature_names = loaded_vectorizer.get_feature_names_out()
     non_zero_indices = X_test_vect.nonzero()[1]
     contributing_words = [feature_names[idx] for idx in non_zero_indices]
-    print("Contributing words for prediction L1:", contributing_words)
+    logger.log_message(message=f"Contributing words for predictions {y_pred} {contributing_words}",level="info")
     L1 = y_pred[0]
     L2 = grabL2Category(eventDesc, L1)
 
@@ -91,6 +109,7 @@ def classify_event(description):
             level_1_score = score
             level_1_tag = l1_tags[keyword]
             l1_reason = keyword
+            logger.log_message(message=f"score: {score} | tag: {level_1_tag} | keyword: {keyword}")
 
     # Filter L2 tags based on the chosen L1 tag
     filtered_l2_tags = {
