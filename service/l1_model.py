@@ -43,7 +43,7 @@ def train_l1_model():
         X_vect_scaled = scaler.fit_transform(X_vect)
         X_train, X_test, y_train, y_test = train_test_split(X_vect_scaled, y, test_size=0.2, random_state=42)
         model = LogisticRegression(max_iter=1000)
-        param_grid = {'C': [0.1, 1, 10, 100], 'solver': ['liblinear', 'saga']}
+        param_grid = {'C': [0.01,0.1, 1, 10, 100], 'penalty': ['l1', 'l2', 'elasticnet'], 'solver': ['liblinear', 'saga']}
         grid_search = GridSearchCV(model, param_grid, cv=5, scoring='accuracy')
         grid_search.fit(X_train, y_train)
 

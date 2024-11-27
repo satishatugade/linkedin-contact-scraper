@@ -430,7 +430,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
         next_page_count=0
         while True:
             try:
-                print("Inside selenium ")
+                logger.log_message(f"Inside selenium mode scraping",level='info')
                 process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
                 next_page_count += 0
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -438,7 +438,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 try:
                     next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
                     next_button.click()
-                    print("next button clicked page_count ",next_page_count)
+                    logger.log_message(f"next button clicked page_count {next_page_count}",level='info')
                     time.sleep(6)
                 except Exception as e:
                     error_reason = f"No more pages or error clicking next button: {str(e)}"

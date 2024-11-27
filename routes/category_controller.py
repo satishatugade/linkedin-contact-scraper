@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 import json
-from service.categories import classify_event, grabL1Category 
+from service.categories import grabL1Category 
 import utils.logging as logger 
 from service.l1_model import train_l1_model  
 from service.l2_model import train_l2_models 
@@ -56,19 +56,19 @@ def fetch_categories():
         logger.log_message(f"Error during prediction: {str(e)}", level='error')
         return jsonify({"error": str(e)}), 500
 
-@fetch_categories_blueprint.route('/api/classify', methods=['POST'])
-def classify():
-    try:
-        data = request.get_json()
-        event_name = data.get('event_name')
-        event_desc = data.get('event_description')
+# @fetch_categories_blueprint.route('/api/classify', methods=['POST'])
+# def classify():
+#     try:
+#         data = request.get_json()
+#         event_name = data.get('event_name')
+#         event_desc = data.get('event_description')
 
-        if not event_name or not event_desc:
-            return jsonify({"error": "Both 'eventName' and 'eventDesc' are required."}), 400
+#         if not event_name or not event_desc:
+#             return jsonify({"error": "Both 'eventName' and 'eventDesc' are required."}), 400
         
-        description=f"{event_name} {event_desc}"
-        result = classify_event(description)
-        return jsonify({"data":result,"error":None })
-    except Exception as e:
-        logger.log_message(message=f"Exception while getting L1/L2 tags {e}", level="error")
-        return jsonify({"data":None,"error":f"Exception while getting L1/L2 tags {e}" })
+#         description=f"{event_name} {event_desc}"
+#         result = classify_event(description)
+#         return jsonify({"data":result,"error":None })
+#     except Exception as e:
+#         logger.log_message(message=f"Exception while getting L1/L2 tags {e}", level="error")
+#         return jsonify({"data":None,"error":f"Exception while getting L1/L2 tags {e}" })
