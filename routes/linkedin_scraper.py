@@ -366,9 +366,9 @@ def take_screenshot_of_elements(driver, sddh_id, page_count, folder_path, screen
 def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason):
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.", level='info')
-    page_count = 1
-
+    # page_count = 1
     if scraping_mode == 'ocr':
+        page_count = 1
         folder_name = f"{sddh_id}"
         folder_path = os.path.join(os.getcwd(), "screenshots", folder_name)
         os.makedirs(folder_path, exist_ok=True)
@@ -427,64 +427,18 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 break
 
     elif scraping_mode == 'selenium':
+        next_page_count=0
         while True:
             try:
-                reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "reusable-search__entity-result-list")))
-                # attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "reusable-search__result-container")
-                attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "ZFLZRoMHutorsdsBqUnDzqdxGyqQwCkbfAWzw")
-                for attendee_element in attendee_elements:
-                    try:
-                        name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
-                    except Exception as e:
-                        name = "LinkedIn Member"
-                        logger.log_message(f"Exception occured not getting x path for contact name", level='error')
-                    try:
-                        location = attendee_element.find_element(By.CLASS_NAME, "entity-result__secondary-subtitle").text
-                    except Exception as e:
-                        location = "Unknown Location"
-                        logger.log_message(f"Exception occured not getting x path for location : {e}", level='error')
-                    try:
-                        # occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
-                        occupation = attendee_element.find_element(By.CLASS_NAME, "SzGzGXOjhlSxBLZREYXHQcmesGktYIsGbwt").text
-                    except Exception as e:
-                        occupation = "Unknown Occupation"
-                        logger.log_message(f"Exception occured not getting x path for occupation : {e}", level='error')
-                    try:
-                        # occupation = attendee_element.find_element(By.CLASS_NAME, "entity-result__primary-subtitle").text
-                        profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
-                    except Exception as e:
-                        profile_image = ""   
-                        logger.log_message(f"Exception occured not getting x path for profile_image : {e}", level='error') 
-                    try:
-                        # profile_url = attendee_element.find_element(By.CSS_SELECTOR, "a.app-aware-link").get_attribute("href")
-                        profile_url = attendee_element.find_element(By.CLASS_NAME, "JTJydmASbTYtnYqLfPYAKInueMDRqsilJLNI").get_attribute("href")
-                    except Exception as e:
-                        profile_url = "Unknown Profile URL"
-                        logger.log_message(f"Exception occured not getting x path for profile_url : {e}", level='error')
-
-                    attendee = {
-                        "sddh_id": sddh_id,
-                        "name": name,
-                        "location": location,
-                        "occupation": occupation,
-                        "profile_url": profile_url,
-                        "profile_image": profile_image,
-                        "linkedin_link": linkedin_link, 
-                        "company_linkedin_url": company_linkedin_url,  
-                        "source": scraping_mode, 
-                        "error_reason": error_reason 
-                    }
-                    save_attendee_data(attendee)
-
-                page_count += 1
-
+                print("Inside selenium ")
+                process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
+                next_page_count += 0
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(3)
-
                 try:
                     next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
                     next_button.click()
-                    print("next button clicked page_count ",page_count)
+                    print("next button clicked page_count ",next_page_count)
                     time.sleep(6)
                 except Exception as e:
                     error_reason = f"No more pages or error clicking next button: {str(e)}"
@@ -518,4 +472,55 @@ def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
     screenshot_path = os.path.join(folder_path, f"{sddh_id}_{prefix}_page_{page_count}.png")
     driver.save_screenshot(screenshot_path)
     logger.log_message(f"Screenshot saved: {screenshot_path}",level='info')
+
+
+def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
+    reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "vmXqmQukdnyDWYtoMgptPWNIYCQLdoosys")))
+    attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "jeunwPGJmLFbispnuBzeitiGewwbttjxdzgQ")
+
+    for attendee_element in attendee_elements:
+        print("Processing an attendee element...")
+        try:
+            name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
+        except Exception as e:
+            name = "LinkedIn Member"
+            logger.log_message(f"Exception occurred while extracting name: {e}", level='error')
+
+        try:
+            location = attendee_element.find_element(By.CLASS_NAME, "OjplEaJZzhBoCIdDVFiKyoWGQpUCwEAFYc").text
+        except Exception as e:
+            location = "Unknown Location"
+            logger.log_message(f"Exception occurred while extracting location: {e}", level='error')
+
+        try:
+            occupation = attendee_element.find_element(By.CLASS_NAME, "LcxqaAQEXzuaApsdzTmCwdbKdNUirxSyIw").text
+        except Exception as e:
+            occupation = "Unknown Occupation"
+            logger.log_message(f"Exception occurred while extracting occupation: {e}", level='error')
+
+        try:
+            profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
+        except Exception as e:
+            profile_image = ""
+            logger.log_message(f"Exception occurred while extracting profile_image: {e}", level='error')
+
+        try:
+            profile_url = attendee_element.find_element(By.CLASS_NAME, "pTSsSJsLzRLkMbyTaIxqYJTfuyzbqtZqJVgQ").get_attribute("href")
+        except Exception as e:
+            profile_url = "Unknown Profile URL"
+            logger.log_message(f"Exception occurred while extracting profile_url: {e}", level='error')
+
+        attendee = {
+            "sddh_id": sddh_id,
+            "name": name,
+            "location": location,
+            "occupation": occupation,
+            "profile_url": profile_url,
+            "profile_image": profile_image,
+            "linkedin_link": linkedin_link,
+            "company_linkedin_url": company_linkedin_url,
+            "source": scraping_mode,
+            "error_reason": error_reason
+        }
+        save_attendee_data(attendee)
 
