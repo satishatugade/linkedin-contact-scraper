@@ -456,6 +456,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
 
             except Exception as e:
                 error_reason = f"Error scraping attendees: {str(e)}"
+                update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
                 logger.log_message(error_reason, level='error')
                 attendee = {
                     "sddh_id": sddh_id,
@@ -475,52 +476,57 @@ def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
 
 
 def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
-    reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "vmXqmQukdnyDWYtoMgptPWNIYCQLdoosys")))
-    attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "jeunwPGJmLFbispnuBzeitiGewwbttjxdzgQ")
+    try:
+        # List of attendees on linkedin page
+        reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "OgaxCprRXogGrrTXyFWClLsPfppEwZGXvEacOQ")))
+        attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "MODFUjvcFiJTaWRgTRGciygivpdqAcPEsGfEE")
 
-    for attendee_element in attendee_elements:
-        print("Processing an attendee element...")
-        try:
-            name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
-        except Exception as e:
-            name = "LinkedIn Member"
-            logger.log_message(f"Exception occurred while extracting name: {e}", level='error')
+        for attendee_element in attendee_elements:
+            logger.log_message(f"Processing an attendee element...",level='info')
+            try:
+                name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
+            except Exception as e:
+                name = "LinkedIn Member"
+                logger.log_message(f"Exception occurred while extracting name: {e}", level='error')
 
-        try:
-            location = attendee_element.find_element(By.CLASS_NAME, "OjplEaJZzhBoCIdDVFiKyoWGQpUCwEAFYc").text
-        except Exception as e:
-            location = "Unknown Location"
-            logger.log_message(f"Exception occurred while extracting location: {e}", level='error')
+            try:
+                location = attendee_element.find_element(By.CLASS_NAME, "VcoblWemUczQjpeEyQpxrzvPCgcjRXtk").text
+            except Exception as e:
+                location = "Unknown Location"
+                logger.log_message(f"Exception occurred while extracting location: {e}", level='error')
 
-        try:
-            occupation = attendee_element.find_element(By.CLASS_NAME, "LcxqaAQEXzuaApsdzTmCwdbKdNUirxSyIw").text
-        except Exception as e:
-            occupation = "Unknown Occupation"
-            logger.log_message(f"Exception occurred while extracting occupation: {e}", level='error')
+            try:
+                occupation = attendee_element.find_element(By.CLASS_NAME, "crZDDrSWIoUgOsfNJfOGuGXsiVbpAJmLhDjog").text
+            except Exception as e:
+                occupation = "Unknown Occupation"
+                logger.log_message(f"Exception occurred while extracting occupation: {e}", level='error')
 
-        try:
-            profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
-        except Exception as e:
-            profile_image = ""
-            logger.log_message(f"Exception occurred while extracting profile_image: {e}", level='error')
+            try:
+                profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
+            except Exception as e:
+                profile_image = ""
+                logger.log_message(f"Exception occurred while extracting profile_image: {e}", level='error')
 
-        try:
-            profile_url = attendee_element.find_element(By.CLASS_NAME, "pTSsSJsLzRLkMbyTaIxqYJTfuyzbqtZqJVgQ").get_attribute("href")
-        except Exception as e:
-            profile_url = "Unknown Profile URL"
-            logger.log_message(f"Exception occurred while extracting profile_url: {e}", level='error')
+            try:
+                profile_url = attendee_element.find_element(By.CLASS_NAME, "bTAdwGKKvYMAMWcpQvYfUkUWxtNkDLxQjQZsQ").get_attribute("href")
+            except Exception as e:
+                profile_url = "Unknown Profile URL"
+                logger.log_message(f"Exception occurred while extracting profile_url: {e}", level='error')
 
-        attendee = {
-            "sddh_id": sddh_id,
-            "name": name,
-            "location": location,
-            "occupation": occupation,
-            "profile_url": profile_url,
-            "profile_image": profile_image,
-            "linkedin_link": linkedin_link,
-            "company_linkedin_url": company_linkedin_url,
-            "source": scraping_mode,
-            "error_reason": error_reason
-        }
-        save_attendee_data(attendee)
+            attendee = {
+                "sddh_id": sddh_id,
+                "name": name,
+                "location": location,
+                "occupation": occupation,
+                "profile_url": profile_url,
+                "profile_image": profile_image,
+                "linkedin_link": linkedin_link,
+                "company_linkedin_url": company_linkedin_url,
+                "source": scraping_mode,
+                "error_reason": error_reason
+            }
+            save_attendee_data(attendee)
+    except Exception as e:
+        logger.log_message(f"Exception occurred while finding reusable_search_result_list: {e}", level='error')
+
 

@@ -92,7 +92,6 @@ def grabL1Category(eventName, eventDesc):
     if cosine_results.get("L1") is not None:
         if str(cosine_results["L1"]).strip() not in result["L1"]:
             result["L1"].append(cosine_results["L1"])
-            print("Not there")
 
     if cosine_results.get("L2") is not None:
         if str(cosine_results["L2"][0]).strip() not in result["L2"]:
