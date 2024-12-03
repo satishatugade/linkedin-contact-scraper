@@ -436,36 +436,26 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(3)
                 try:
-                    next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
-                    next_button.click()
-                    logger.log_message(f"next button clicked page_count {next_page_count}",level='info')
-                    time.sleep(6)
+                    # next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
+                    # next_button.click()
+                    # logger.log_message(f"next button clicked page_count {next_page_count}",level='info')
+                    # time.sleep(6)
+                    if not click_next_page(wait, next_page_count):
+                        print("next_page_count ",next_page_count)
+                        error_reason = f"No more pages available after {next_page_count} pages."
+                        logger.log_message(error_reason, level="info")
+                        update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "success", error_reason)
+                        break
                 except Exception as e:
                     error_reason = f"No more pages or error clicking next button: {str(e)}"
                     update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
                     logger.log_message(error_reason, level='error')
-                    attendee = {
-                        "sddh_id": sddh_id,
-                        "linkedin_link": linkedin_link,
-                        "company_linkedin_url": company_linkedin_url,
-                        "source": scraping_mode,
-                        "error_reason": error_reason
-                    }
-                    save_attendee_data(attendee)
                     break
 
             except Exception as e:
                 error_reason = f"Error scraping attendees: {str(e)}"
-                update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
+                update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
                 logger.log_message(error_reason, level='error')
-                attendee = {
-                    "sddh_id": sddh_id,
-                    "linkedin_link": linkedin_link,
-                    "company_linkedin_url": company_linkedin_url,
-                    "source": scraping_mode,
-                    "error_reason": error_reason
-                }
-                save_attendee_data(attendee)
                 break
 
 def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
@@ -474,6 +464,16 @@ def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
     driver.save_screenshot(screenshot_path)
     logger.log_message(f"Screenshot saved: {screenshot_path}",level='info')
 
+def click_next_page(wait, next_page_count):
+    try:
+        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
+        next_button.click()
+        logger.log_message(f"Next button clicked. Page count: {next_page_count}", level="info")
+        time.sleep(6)  # Allow time for the next page to load
+        return True
+    except Exception as e:
+        logger.log_message(f"Failed to click the next button on page {next_page_count}: {str(e)}", level="warning")
+        return False
 
 def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
     try:
