@@ -431,7 +431,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
         while True:
             try:
                 logger.log_message(f"Inside selenium mode scraping",level='info')
-                process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
+                process_attendee_elements(driver,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
                 next_page_count += 0
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(3)
@@ -472,14 +472,24 @@ def click_next_page(wait, next_page_count):
         time.sleep(6)  # Allow time for the next page to load
         return True
     except Exception as e:
-        logger.log_message(f"Failed to click the next button on page {next_page_count}: {str(e)}", level="warning")
+        logger.log_message(f"Failed to click the next button on page {next_page_count}: {str(e)}", level="error")
         return False
 
-def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
+def process_attendee_elements(driver,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
     try:
         # List of attendees on linkedin page
-        reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "OgaxCprRXogGrrTXyFWClLsPfppEwZGXvEacOQ")))
-        attendee_elements = reusable_search_result_list.find_elements(By.CLASS_NAME, "MODFUjvcFiJTaWRgTRGciygivpdqAcPEsGfEE")
+        try:
+            # reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "OgaxCprRXogGrrTXyFWClLsPfppEwZGXvEacOQ")))
+            reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.search-results-container > div > div.pv0.ph0.mb2.artdeco-card > ul")))
+        except Exception as e:
+            logger.log_message(f"Exception occurred while getting reusable_search_result_list {e}", level='error')
+            return
+        try:
+            print("reusable_search_result_list ",reusable_search_result_list)
+            attendee_elements = reusable_search_result_list.find_elements(By.CSS_SELECTOR, "li")
+            print("attendee_elements ",attendee_elements)
+        except Exception as e:
+            logger.log_message(f"Exception occurred while getting attendee_elements {e}", level='error')
 
         for attendee_element in attendee_elements:
             logger.log_message(f"Processing an attendee element...",level='info')
@@ -490,13 +500,15 @@ def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url,
                 logger.log_message(f"Exception occurred while extracting name: {e}", level='error')
 
             try:
-                location = attendee_element.find_element(By.CLASS_NAME, "VcoblWemUczQjpeEyQpxrzvPCgcjRXtk").text
+                # location = attendee_element.find_element(By.CLASS_NAME, "VcoblWemUczQjpeEyQpxrzvPCgcjRXtk").text
+                location = attendee_element.find_element(By.CSS_SELECTOR, "div.linked-area.flex-1.cursor-pointer > div > div > div > div:nth-of-type(3)").text
             except Exception as e:
                 location = "Unknown Location"
                 logger.log_message(f"Exception occurred while extracting location: {e}", level='error')
 
             try:
-                occupation = attendee_element.find_element(By.CLASS_NAME, "crZDDrSWIoUgOsfNJfOGuGXsiVbpAJmLhDjog").text
+                # occupation = attendee_element.find_element(By.CLASS_NAME, "crZDDrSWIoUgOsfNJfOGuGXsiVbpAJmLhDjog").text
+                occupation = attendee_element.find_element(By.CSS_SELECTOR, "div.t-14.t-black.t-normal").text
             except Exception as e:
                 occupation = "Unknown Occupation"
                 logger.log_message(f"Exception occurred while extracting occupation: {e}", level='error')
@@ -508,7 +520,8 @@ def process_attendee_elements(wait,sddh_id, linkedin_link, company_linkedin_url,
                 logger.log_message(f"Exception occurred while extracting profile_image: {e}", level='error')
 
             try:
-                profile_url = attendee_element.find_element(By.CLASS_NAME, "bTAdwGKKvYMAMWcpQvYfUkUWxtNkDLxQjQZsQ").get_attribute("href")
+                # profile_url = attendee_element.find_element(By.CLASS_NAME, "bTAdwGKKvYMAMWcpQvYfUkUWxtNkDLxQjQZsQ").get_attribute("href")
+                profile_url = attendee_element.find_element(By.CSS_SELECTOR, "div.t-roman.t-sans > div > span > span > a").get_attribute("href")
             except Exception as e:
                 profile_url = "Unknown Profile URL"
                 logger.log_message(f"Exception occurred while extracting profile_url: {e}", level='error')
