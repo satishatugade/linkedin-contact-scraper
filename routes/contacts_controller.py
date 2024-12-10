@@ -3,6 +3,7 @@ import utils.logging as logger
 # from concurrent.futures import ThreadPoolExecutor
 import threading
 from routes.linkedin_scraper import process_event_page, fetch_linkedin_url_dump_detail_table,update_contact_scraping_status
+from service.attendee import fetch_all_selectors
 # from controllers.linkedin_scraper import process_event_page, getLinkFromContactInfo, fetch_sddh_by_id
 
 contact_scraper_bp = Blueprint('scraper', __name__)
@@ -42,4 +43,26 @@ def scrape_linkedin_atteendees_data():
     
     logger.log_message(f"Linkedin contact scraping started !",level='info')
     return jsonify({'message': 'Linkedin contact scraping started !'}), 200
+
+@contact_scraper_bp.route('/api/fetch-selectors', methods=['GET'])
+def fetch_selectors():
+    """
+    Fetch selectors from the database and return them in the response.
+    """
+    selectors = fetch_all_selectors()
+    
+    if selectors is None:
+        return jsonify({"message": "Failed to fetch selectors. Check the logs for more details."}), 500
+    elif not selectors:
+        return jsonify({"message": "No selectors found in the database."}), 404
+    else:
+       if isinstance(selectors, dict):
+            selectors_response = [{"element_name": element_name, "selector_type": data["selector_type"], "selector_value": data["selector_value"]} for element_name, data in selectors.items()]
+       else:
+            selectors_response = [{"element_name": element_name, "selector_type": data["selector_type"], "selector_value": data["selector_value"]} for element_name, data in selectors]
+
+       return jsonify({
+            "message": "Selectors fetched successfully",
+            "selectors": selectors_response
+        }), 200
 

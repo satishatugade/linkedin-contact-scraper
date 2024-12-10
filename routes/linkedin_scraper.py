@@ -8,6 +8,7 @@ import os
 import psycopg2
 from selenium.common.exceptions import ElementClickInterceptedException
 import datetime
+from service.attendee import fetch_all_selectors, get_selector_info
 # from config.database_config as config
 from config import database_config as DB
 
@@ -187,7 +188,6 @@ def is_login_successful(driver):
         logger.log_message(f"Login successful!",level='info')
         return True
     else:
-        error_reason = f"Login unsuccessful. Current URL: {driver.current_url}"
         logger.log_message(f"Login unsuccessful. Current URL: {driver.current_url}",level='error')
         return False
 
@@ -221,14 +221,15 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
         time.sleep(5)
         logger.log_message(f"Visiting company page: {company_linkedin_url}", level='info')
 
+        selectors = fetch_all_selectors()
         # Step 4: Check for the "Attend" button
-        if click_attend_button(wait):
+        if click_attend_button(wait,selectors):
             linkedin_link = driver.current_url
             logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}", level='info')
 
             # Try to click the 'Attendees' link and paginate through the attendees
-            if click_attendees_link(wait):
-                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
+            if click_attendees_link(wait,selectors):
+                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason,selectors)
                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 error_reason = "Attendees link not found."
@@ -236,10 +237,10 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
         else:
             logger.log_message(f"Attend button not found. Checking for 'Attendees' link.", level='info')
             # Step 5: If "Attend" button is not found, check for "Attendees" link
-            if click_attendees_link(wait):
+            if click_attendees_link(wait,selectors):
                 linkedin_link = driver.current_url
                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
-                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason)
+                handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason,selectors)
                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
             else:
                 logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
@@ -274,12 +275,20 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_n
         driver.quit()
 
 
-def click_attend_button(wait):
+def click_attend_button(wait,selectors):
     """Attempt to click the 'Attend' button."""
     logger.log_message(f"Attempting to click the 'Attend' button",level='info')
     try:
-        # attend_button = wait.until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[6]/div[3]/div[2]/div/div/main/section[1]/div[1]/div[2]/div/div[1]/div[2]/div[1]/button/span")))
-        attend_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-button.artdeco-button--2.artdeco-button--primary.ember-view span.artdeco-button__text")))
+        attend_button = "attend_button"
+        selector_info = get_selector_info(attend_button, selectors)
+
+        if not selector_info:
+            logger.log_message(f"Failed to get selector information for {attend_button}.", level='error')
+            return False  
+
+        selector_type, selector_value = selector_info
+        # attend_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-button.artdeco-button--2.artdeco-button--primary.ember-view span.artdeco-button__text")))
+        attend_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value)))
         attend_button.click()
         time.sleep(5)
         logger.log_message(f"Attend button clicked successfully",level='info')
@@ -289,11 +298,20 @@ def click_attend_button(wait):
         logger.log_message(f"{error_reason}",level='info')
         return False
 
-def click_attendees_link(wait):
+def click_attendees_link(wait,selectors):
     """Attempt to click the 'Attendees' link."""
     logger.log_message(f"Attempting to click the 'Attendees' link",level='info')
     try:
-        attendees_link = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a.link-without-visited-state.full-width")))
+        attendees_link = "attendees_link"
+        selector_info = get_selector_info(attendees_link, selectors)
+
+        if not selector_info:
+            logger.log_message(f"Failed to get selector information for {attendees_link}.", level='error')
+            return False  
+
+        selector_type, selector_value = selector_info
+        # attendees_link = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a.link-without-visited-state.full-width")))
+        attendees_link = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value)))
         attendees_link.click()
         time.sleep(5)
         logger.log_message(f"Attendees link clicked successfully",level='info')
@@ -333,13 +351,22 @@ def get_upcoming_event_links(wait):
         logger.log_message(f"Error fetching upcoming event links:",level='error')
         return []
 
-def click_next_button(driver, wait):
+def click_next_button(driver, wait,selectors):
     """Attempt to click the 'Next' button."""
     logger.log_message(f"Attempting to click the 'Next' button", level='info')
     try:
-        # Wait for the 'Next' button to be clickable using the aria-label
-        next_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Next']")))
-        driver.execute_script("arguments[0].scrollIntoView(true);", next_button)  # Scroll into view if needed
+        next_button_element = "next_button"
+        selector_info = get_selector_info(next_button_element, selectors)
+
+        if not selector_info:
+            logger.log_message(f"Failed to get selector information for {next_button_element}.", level='error')
+            return False  
+
+        selector_type, selector_value = selector_info
+        
+        # next_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Next']")))
+        next_button = wait.until(EC.element_to_be_clickable((By.XPATH,selector_value)))
+        driver.execute_script("arguments[0].scrollIntoView(true);", next_button) 
         time.sleep(2)  
         try:
             next_button.click()
@@ -363,7 +390,7 @@ def take_screenshot_of_elements(driver, sddh_id, page_count, folder_path, screen
     time.sleep(9)  
     take_screenshot(driver, sddh_id, page_count, folder_path, screenshot_type)
     
-def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason):
+def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason,selectors):
     """Handle pagination for OCR or Selenium mode."""
     logger.log_message(f"Handling pagination with {scraping_mode} mode.", level='info')
     # page_count = 1
@@ -431,7 +458,7 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
         while True:
             try:
                 logger.log_message(f"Inside selenium mode scraping",level='info')
-                process_attendee_elements(driver,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
+                process_attendee_elements(selectors,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason)
                 next_page_count += 0
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(3)
@@ -440,8 +467,8 @@ def handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scrap
                     # next_button.click()
                     # logger.log_message(f"next button clicked page_count {next_page_count}",level='info')
                     # time.sleep(6)
-                    if not click_next_page(wait, next_page_count):
-                        print("next_page_count ",next_page_count)
+                    if not click_next_page(wait, next_page_count,selectors):
+                        logger.log_message(f"next_page_count : {next_page_count}",level='info')
                         error_reason = f"No more pages available after {next_page_count} pages."
                         logger.log_message(error_reason, level="info")
                         update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "success", error_reason)
@@ -464,9 +491,18 @@ def take_screenshot(driver, sddh_id, page_count, folder_path, prefix):
     driver.save_screenshot(screenshot_path)
     logger.log_message(f"Screenshot saved: {screenshot_path}",level='info')
 
-def click_next_page(wait, next_page_count):
+def click_next_page(wait, next_page_count,selectors):
     try:
-        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
+        next_page = "next_page"
+        selector_info = get_selector_info(next_page, selectors)
+
+        if not selector_info:
+            logger.log_message(f"Failed to get selector information for {next_page}.", level='error')
+            return False  
+
+        selector_type, selector_value = selector_info
+        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value)))
+        # next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.artdeco-pagination__button--next")))
         next_button.click()
         logger.log_message(f"Next button clicked. Page count: {next_page_count}", level="info")
         time.sleep(6)  # Allow time for the next page to load
@@ -475,53 +511,104 @@ def click_next_page(wait, next_page_count):
         logger.log_message(f"Failed to click the next button on page {next_page_count}: {str(e)}", level="error")
         return False
 
-def process_attendee_elements(driver,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
+def process_attendee_elements(selectors,wait,sddh_id, linkedin_link, company_linkedin_url, scraping_mode, error_reason):
     try:
         # List of attendees on linkedin page
         try:
-            # reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "OgaxCprRXogGrrTXyFWClLsPfppEwZGXvEacOQ")))
-            reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.search-results-container > div > div.pv0.ph0.mb2.artdeco-card > ul")))
+            search_list = "reusable_search_result_list"
+            selector_info = get_selector_info(search_list, selectors)
+
+            if not selector_info:
+                logger.log_message(f"Failed to get selector information for {search_list}.", level='error')
+                return False  
+
+            selector_type, selector_value = selector_info
+            # reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.search-results-container > div > div.pv0.ph0.mb2.artdeco-card > ul")))
+            reusable_search_result_list = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,selector_value)))
         except Exception as e:
             logger.log_message(f"Exception occurred while getting reusable_search_result_list {e}", level='error')
             return
         try:
-            print("reusable_search_result_list ",reusable_search_result_list)
+            attendee_element = "reusable_search_result_list_1"
+            selector_info = get_selector_info(attendee_element, selectors)
+
+            if not selector_info:
+                logger.log_message(f"Failed to get selector information for {attendee_element}.", level='error')
+                return False 
+
+            selector_type, selector_value = selector_info
             attendee_elements = reusable_search_result_list.find_elements(By.CSS_SELECTOR, "li")
-            print("attendee_elements ",attendee_elements)
         except Exception as e:
             logger.log_message(f"Exception occurred while getting attendee_elements {e}", level='error')
 
         for attendee_element in attendee_elements:
             logger.log_message(f"Processing an attendee element...",level='info')
             try:
-                name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
+                attendee_name = "attendee_name"
+                selector_info = get_selector_info(attendee_name, selectors)
+
+                if not selector_info:
+                    logger.log_message(f"Failed to get selector information for {attendee_name}.", level='error')
+
+                selector_type, selector_value = selector_info
+                # name = attendee_element.find_element(By.CSS_SELECTOR, "span[aria-hidden='true']").text
+                name = attendee_element.find_element(By.CSS_SELECTOR, selector_value).text
             except Exception as e:
                 name = "LinkedIn Member"
                 logger.log_message(f"Exception occurred while extracting name: {e}", level='error')
 
             try:
-                # location = attendee_element.find_element(By.CLASS_NAME, "VcoblWemUczQjpeEyQpxrzvPCgcjRXtk").text
-                location = attendee_element.find_element(By.CSS_SELECTOR, "div.linked-area.flex-1.cursor-pointer > div > div > div > div:nth-of-type(3)").text
+                attendee_location = "attendee_location"
+                selector_info = get_selector_info(attendee_location, selectors)
+
+                if not selector_info:
+                    logger.log_message(f"Failed to get selector information for {attendee_location}.", level='error')
+
+                selector_type, selector_value = selector_info
+                # location = attendee_element.find_element(By.CSS_SELECTOR, "div.linked-area.flex-1.cursor-pointer > div > div > div > div:nth-of-type(3)").text
+                location = attendee_element.find_element(By.CSS_SELECTOR, selector_value).text
             except Exception as e:
                 location = "Unknown Location"
                 logger.log_message(f"Exception occurred while extracting location: {e}", level='error')
 
             try:
-                # occupation = attendee_element.find_element(By.CLASS_NAME, "crZDDrSWIoUgOsfNJfOGuGXsiVbpAJmLhDjog").text
-                occupation = attendee_element.find_element(By.CSS_SELECTOR, "div.t-14.t-black.t-normal").text
+                attendee_occupation = "attendee_occupation" 
+                selector_info = get_selector_info(attendee_occupation, selectors)
+
+                if not selector_info:
+                    logger.log_message(f"Failed to get selector information for {attendee_occupation}.", level='error')
+
+                selector_type, selector_value = selector_info
+                # occupation = attendee_element.find_element(By.CSS_SELECTOR, "div.t-14.t-black.t-normal").text
+                occupation = attendee_element.find_element(By.CSS_SELECTOR, selector_value).text
             except Exception as e:
                 occupation = "Unknown Occupation"
                 logger.log_message(f"Exception occurred while extracting occupation: {e}", level='error')
 
             try:
-                profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
+                profile_image = "profile_image"
+                selector_info = get_selector_info(profile_image, selectors)
+
+                if not selector_info:
+                    logger.log_message(f"Failed to get selector information for {profile_image}.", level='error')
+
+                selector_type, selector_value = selector_info
+                profile_image = attendee_element.find_element(By.CLASS_NAME, selector_value).get_attribute("src")
+                # profile_image = attendee_element.find_element(By.CLASS_NAME, "presence-entity__image").get_attribute("src")
             except Exception as e:
                 profile_image = ""
                 logger.log_message(f"Exception occurred while extracting profile_image: {e}", level='error')
 
             try:
-                # profile_url = attendee_element.find_element(By.CLASS_NAME, "bTAdwGKKvYMAMWcpQvYfUkUWxtNkDLxQjQZsQ").get_attribute("href")
-                profile_url = attendee_element.find_element(By.CSS_SELECTOR, "div.t-roman.t-sans > div > span > span > a").get_attribute("href")
+                profile_url = "profile_url"
+                selector_info = get_selector_info(profile_url, selectors)
+
+                if not selector_info:
+                    logger.log_message(f"Failed to get selector information for {profile_url}.", level='error')
+
+                selector_type, selector_value = selector_info
+                # profile_url = attendee_element.find_element(By.CSS_SELECTOR, "div.t-roman.t-sans > div > span > span > a").get_attribute("href")
+                profile_url = attendee_element.find_element(By.CSS_SELECTOR, selector_value).get_attribute("href")
             except Exception as e:
                 profile_url = "Unknown Profile URL"
                 logger.log_message(f"Exception occurred while extracting profile_url: {e}", level='error')

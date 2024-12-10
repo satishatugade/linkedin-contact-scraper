@@ -45,3 +45,51 @@ def save_attendee_data(attendee):
     finally:
         if db_conn:
             db_conn.close()
+
+def fetch_all_selectors():
+    """
+    Fetch all element selectors from the database and return them in a structured format.
+    """
+    db_conn = DB.database_connection()
+    if not db_conn:
+        logger.log_message(f"Failed to connect to the database", level='error')
+        return None 
+
+    try:
+        cursor = db_conn.cursor()
+        query = "SELECT element_name, selector_type, selector_value FROM uq_contact_element_mapping"
+        cursor.execute(query)
+        results = cursor.fetchall()
+        cursor.close()
+        db_conn.close()
+
+        if not results:
+            logger.log_message("No selectors found in the database", level='warning')
+            return {} 
+        selectors = {
+            row[0]: {'selector_type': row[1], 'selector_value': row[2]} for row in results
+        }
+        return selectors
+
+    except Exception as e:
+        logger.log_message(f"Error fetching selectors from the database: {str(e)}", level='error')
+        if db_conn:
+            db_conn.close()     
+        return None  
+  
+def get_selector_info(element_name, selectors):
+    try:
+        if element_name not in selectors:
+            logger.log_message(f"Selector for {element_name} not found in the selectors dictionary.", level='error')
+            return None
+
+        selector_info = selectors[element_name]
+        selector_type = selector_info['selector_type']
+        selector_value = selector_info['selector_value']
+
+        return selector_type, selector_value
+    
+    except Exception as e:
+        logger.log_message(f"Error retrieving selector info for {element_name}: {str(e)}", level='error')
+        return None
+
