@@ -11,6 +11,7 @@ import datetime
 from service.attendee import fetch_all_selectors, get_selector_info
 # from config.database_config as config
 from config import database_config as DB
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 
 
 class ContactInfo:
@@ -192,133 +193,84 @@ def is_login_successful(driver):
         return False
     
 
-
-
-# def handle_event_registration(driver, wait, selectors):
-#     try:
-#         # Extract selector for the checkbox
-#         checkbox_selector = selectors.get("presence_checkbox")
-#         if not checkbox_selector:
-#             logger.log_message("Checkbox selector not found in the selectors dictionary.", level="error")
-#             return "failed"
-
-#         selector_type = checkbox_selector.get("selector_type")
-#         selector_value = checkbox_selector.get("selector_value")
-
-#         if not selector_type or not selector_value:
-#             logger.log_message("Invalid selector for checkbox", level="error")
-#             return "failed"
-
-#         # 1. Attempt to click the <label> element
-#         try:
-#             logger.log_message("Trying to click the associated <label> element", level="info")
-#             label = driver.find_element(By.CSS_SELECTOR, f"label[for='{selector_value.split('#')[1]}']")
-#             label.click()
-#             logger.log_message("Successfully clicked the <label> element", level="info")
-#             return "success"
-#         except Exception as e:
-#             logger.log_message(f"Failed to click <label>: {str(e)}", level="warning")
-
-#         # 2. Attempt to click the checkbox using JavaScript
-#         try:
-#             logger.log_message("Trying to click the checkbox using JavaScript", level="info")
-#             checkbox = driver.find_element(getattr(By, selector_type.upper()), selector_value)
-#             driver.execute_script("arguments[0].click();", checkbox)
-#             logger.log_message("Successfully clicked the checkbox using JavaScript", level="info")
-#             return "success"
-#         except Exception as e:
-#             logger.log_message(f"Failed to click checkbox with JavaScript: {str(e)}", level="warning")
-
-#         # 3. Ensure visibility and click the checkbox
-#         try:
-#             logger.log_message("Trying to ensure visibility and click the checkbox", level="info")
-#             wait = WebDriverWait(driver, 10)
-#             checkbox = wait.until(EC.element_to_be_clickable((getattr(By, selector_type.upper()), selector_value)))
-#             checkbox.click()
-#             logger.log_message("Successfully clicked the checkbox", level="info")
-#             return "success"
-#         except Exception as e:
-#             logger.log_message(f"Failed to click checkbox even after ensuring visibility: {str(e)}", level="error")
-#             return "failed"
-
-#     except Exception as e:
-#         logger.log_message(f"Error during checkbox click: {str(e)}", level="error")
-#         return "failed"
 def handle_event_registration(driver, wait, selectors):
     try:
-        # Extract selector for the checkbox
-        checkbox_selector = selectors.get("presence_checkbox")
-        if not checkbox_selector:
-            logger.log_message("Checkbox selector not found in the selectors dictionary.", level="error")
-            return "failed"
-
-        selector_type = checkbox_selector.get("selector_type")
-        selector_value = checkbox_selector.get("selector_value")
-
-        if not selector_type or not selector_value:
-            logger.log_message("Invalid selector for checkbox", level="error")
-            return "failed"
-
-        # 1. Attempt to click the <label> element
+        # Locate the main button (Register or Attend)
         try:
-            logger.log_message("Trying to click the associated <label> element", level="info")
-            label = driver.find_element(By.CSS_SELECTOR, f"label[for='{selector_value.split('#')[1]}']")
-            label.click()
-            logger.log_message("Successfully clicked the <label> element", level="info")
-        except Exception as e:
-            logger.log_message(f"Failed to click <label>: {str(e)}", level="warning")
-
-        # 2. Attempt to click the checkbox using JavaScript
-        # try:
-        #     logger.log_message("Trying to click the checkbox using JavaScript", level="info")
-        #     checkbox = driver.find_element(getattr(By, selector_type.upper()), selector_value)
-        #     driver.execute_script("arguments[0].click();", checkbox)
-        #     logger.log_message("Successfully clicked the checkbox using JavaScript", level="info")
-        # except Exception as e:
-        #     logger.log_message(f"Failed to click checkbox with JavaScript: {str(e)}", level="warning")
-
-        # # 3. Ensure visibility and click the checkbox
-        # try:
-        #     logger.log_message("Trying to ensure visibility and click the checkbox", level="info")
-        #     checkbox = wait.until(EC.element_to_be_clickable((getattr(By, selector_type.upper()), selector_value)))
-        #     checkbox.click()
-        #     logger.log_message("Successfully clicked the checkbox", level="info")
-        # except Exception as e:
-        #     logger.log_message(f"Failed to click checkbox even after ensuring visibility: {str(e)}", level="error")
-        #     return "failed"
-
-        # Extract selector for the submit button
-        submit_selector = selectors.get("submit_button")
-        if not submit_selector:
-            logger.log_message("Submit button selector not found in the selectors dictionary.", level="error")
+            main_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selectors['action_button']['selector_value'])))
+            button_text = main_button.text.strip().lower()
+            logger.log_message(f"Detected button text: {button_text}", level="info")
+        except (TimeoutException, NoSuchElementException) as e:
+            logger.log_message(f"Main button not found or not clickable: {str(e)}", level="error")
             return "failed"
 
-        submit_type = submit_selector.get("selector_type")
-        submit_value = submit_selector.get("selector_value")
+        # Handle "Register" button
+        if "register" in button_text:
+            try:
+                logger.log_message("Clicking the 'Register' button", level="info")
+                main_button.click()
+                time.sleep(5)  # Wait for the registration modal to appear
 
-        if not submit_type or not submit_value:
-            logger.log_message("Invalid selector for submit button", level="error")
+                # Locate and click the checkbox
+                checkbox_selector = selectors.get("presence_checkbox")
+                if checkbox_selector:
+                    try:
+                        logger.log_message("Attempting to click the associated <label> element", level="info")
+                        label = driver.find_element(By.CSS_SELECTOR, f"label[for='{checkbox_selector['selector_value'].split('#')[1]}']")
+                        label.click()
+                        logger.log_message("Successfully clicked the <label> element", level="info")
+                    except Exception as e:
+                        logger.log_message(f"Label click failed: {str(e)}. Falling back to JavaScript for checkbox click.", level="warning")
+                        checkbox = driver.find_element(getattr(By, checkbox_selector['selector_type'].upper()), checkbox_selector['selector_value'])
+                        driver.execute_script("arguments[0].click();", checkbox)
+                        logger.log_message("Successfully clicked the checkbox using JavaScript", level="info")
+
+                # Click the submit button
+                submit_selector = selectors.get("submit_button")
+                if submit_selector:
+                    try:
+                        logger.log_message("Clicking the 'Submit' button", level="info")
+                        submit_button = wait.until(EC.element_to_be_clickable((getattr(By, submit_selector['selector_type'].upper()), submit_selector['selector_value'])))
+                        driver.execute_script("arguments[0].click();", submit_button)
+                        logger.log_message("Successfully clicked the 'Submit' button", level="info")
+                        time.sleep(5)  # Wait for the registration process to complete
+                    except Exception as e:
+                        logger.log_message(f"Failed to click 'Submit' button: {str(e)}", level="error")
+                        return "failed"
+            except (ElementClickInterceptedException, Exception) as e:
+                logger.log_message(f"Failed to click 'Register' button: {str(e)}", level="error")
+                return "failed"
+
+        # Handle "Attend" button
+        elif "attend" in button_text:
+            try:
+                logger.log_message("Clicking the 'Attend' button", level="info")
+                main_button.click()
+                time.sleep(5)  # Wait for the attendance process to complete
+                logger.log_message("Successfully clicked the 'Attend' button", level="info")
+            except (ElementClickInterceptedException, Exception) as e:
+                logger.log_message(f"Failed to click 'Attend' button: {str(e)}", level="error")
+                return "failed"
+
+        # Check for attendees link after registration or attendance
+        attendee_selector = selectors.get("attendees_link")
+        if attendee_selector:
+            try:
+                logger.log_message("Looking for 'Attendees' link", level="info")
+                attendee_link = wait.until(EC.element_to_be_clickable((getattr(By, attendee_selector['selector_type'].upper()), attendee_selector['selector_value'])))
+                attendee_link.click()
+                logger.log_message("Successfully clicked the 'Attendees' link", level="info")
+                return "success"
+            except Exception as e:
+                logger.log_message(f"Failed to find or click 'Attendees' link: {str(e)}", level="error")
+                return "failed"
+        else:
+            logger.log_message("Attendees link selector not found in the selectors dictionary.", level="error")
             return "failed"
-
-        # Attempt to click the submit button
-        try:
-            logger.log_message("Trying to click the submit button", level="info")
-            submit_button = driver.find_element(getattr(By, submit_type.upper()), submit_value)
-            driver.execute_script("arguments[0].click();", submit_button)
-            logger.log_message("Successfully clicked the submit button", level="info")
-        except Exception as e:
-            logger.log_message(f"Failed to click submit button: {str(e)}", level="error")
-            return "failed"
-
-        # Wait for 10 seconds to allow any post-submission actions
-        time.sleep(10)
-        logger.log_message("Waited for 10 seconds after submission", level="info")
-        return "success"
 
     except Exception as e:
-        logger.log_message(f"Error during event registration: {str(e)}", level="error")
+        logger.log_message(f"Error during event registration process: {str(e)}", level="error")
         return "failed"
-
 def scroll_and_click_element(driver, wait, element_name, selectors):
    
     try:
@@ -356,88 +308,47 @@ def click_submit_button(wait, selectors):
         return False
 
 
-# def process_event_page(company_linkedin_url, scraping_status_id, sddh_id,event_name, scraping_mode, session_id, li_at_value):
-#     """Process LinkedIn event page based on scraping mode."""
-#     logger.log_message(f"inside process_event_page",level='info')
-#     driver = webdriver.Chrome()
-#     driver.maximize_window()
-#     wait = WebDriverWait(driver, 30)
-#     linkedin_link = None  
-#     error_reason = None 
 
-#     try:
-#         # Step 1: Login to LinkedIn
-#         driver.get("https://www.linkedin.com/")
-#         driver.add_cookie({'name': 'JSESSIONID', 'value': session_id})
-#         driver.add_cookie({'name': 'li_at', 'value': li_at_value})
-#         driver.refresh()
-#         time.sleep(10)
+def check_button_text(driver, wait, selectors):
+    """Check the button text to determine whether it is a Register or Attend button."""
+    try:
+        # Log selectors dictionary for debugging
+        logger.log_message(f"Selectors: {selectors}", level="info")
 
-#         # Step 2: Check if login is successful
-#         if not is_login_successful(driver):
-#             error_reason = "Login failed."
-#             logger.log_message(f"Login failed. Exiting the process.", level='error')
-#             update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
-#             return
+        # Fetch the selector information for the action button
+        button_selector_info = selectors.get("action_button")
+        if not button_selector_info:
+            logger.log_message("Action button selector not found in selectors.", level="error")
+            return None
 
-#         # Step 3: Visit the company LinkedIn URL
-#         driver.get(company_linkedin_url.strip())
-#         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-#         time.sleep(5)
-#         logger.log_message(f"Visiting company page: {company_linkedin_url}", level='info')
+        selector_type = button_selector_info.get("selector_type")
+        selector_value = button_selector_info.get("selector_value")
 
-#         selectors = fetch_all_selectors()
-#         # Step 4: Check for the "Attend" button
-#         if click_attend_button(wait,selectors):
-#             linkedin_link = driver.current_url
-#             logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}", level='info')
-            
-#             # Try to click the 'Attendees' link and paginate through the attendees
-#             if click_attendees_link(wait,selectors):
-#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason,selectors)
-#                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
-#             else:
-#                 error_reason = "Attendees link not found."
-#                 logger.log_message(f"Attendees link not found. Skipping pagination.", level='error')
-#         else:
-#             logger.log_message(f"Attend button not found. Checking for 'Attendees' link.", level='info')
-#             # Step 5: If "Attend" button is not found, check for "Attendees" link
-#             if click_attendees_link(wait,selectors):
-#                 linkedin_link = driver.current_url
-#                 logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
-#                 handle_pagination(driver, wait,scraping_status_id, sddh_id,event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason,selectors)
-#                 update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"success",error_reason)
-#             else:
-#                 logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
-                
-#                 # Step 6: Check for "Show All Events" button
-#                 if click_show_all_events(driver, wait):
-#                     event_links = get_upcoming_event_links(wait)
+        # Log fetched selector information
+        logger.log_message(f"Selector Type: {selector_type}, Selector Value: {selector_value}", level="info")
 
-#                     if event_links:
-#                         logger.log_message(f"Found {len(event_links)} upcoming events.", level='info')
+        if not selector_type or not selector_value:
+            logger.log_message("Invalid action button selector in selectors.", level="error")
+            return None
 
-#                         # Step 7: Process upcoming events if found
-#                         for event_link in event_links:
-#                             linkedin_link = event_link
-#                             logger.log_message(f"Processing upcoming event link: {event_link}", level='info')
-#                             process_event_page(event_link, sddh_id, scraping_mode, session_id, li_at_value)
-#                     else:
-#                         error_reason="No upcoming events available"
-#                         logger.log_message(f"No upcoming events available for URL: {company_linkedin_url}", level='info')
-#                         update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
-                        
-#                 else:
-#                     error_reason="Show All Events button not found."
-#                     logger.log_message(f"Show All Events button not found for URL: {company_linkedin_url}", level='error')
-#                     update_contact_scraping_status_by_id(scraping_status_id,sddh_id,"failed",error_reason)
-          
-#     except Exception as e:
-#         logger.log_message(f"An error occurred while visiting linkedin link: {str(e)}", level='error')
-#         error_reason = str(e)
-        
-#     finally:
-#         driver.quit()
+        # Locate the button element
+        button = wait.until(EC.presence_of_element_located((getattr(By, selector_type.upper()), selector_value)))
+
+        # Get button text
+        button_text = button.text.strip()
+
+        # If button text is empty, use JavaScript as a fallback
+        if not button_text:
+            button_text = driver.execute_script("return arguments[0].textContent.trim();", button)
+            if not button_text:
+                raise Exception("Action button text is empty.")
+
+        logger.log_message(f"Detected button text: {button_text}", level="info")
+        return button_text
+
+    except Exception as e:
+        logger.log_message(f"Error checking button text: {str(e)}", level="error")
+        return None
 
 def process_event_page(company_linkedin_url, scraping_status_id, sddh_id, event_name, scraping_mode, session_id, li_at_value):
     """Process LinkedIn event page based on scraping mode."""
@@ -471,61 +382,60 @@ def process_event_page(company_linkedin_url, scraping_status_id, sddh_id, event_
 
         selectors = fetch_all_selectors()
 
-        # Step 4: Check for the "Attend" button
-        if click_attend_button(wait, selectors):
-            linkedin_link = driver.current_url
-            logger.log_message(f"Attend button found. LinkedIn URL set to: {linkedin_link}", level='info')
+        # Step 4: Handle "Register" or "Attend" buttons
+        button_text = check_button_text(driver, wait, selectors)
 
-            # Handle event registration if form is present
-            registration_status = handle_event_registration(driver, wait, selectors)
-            if registration_status == "success":
-                logger.log_message("Event registration completed successfully.", level="info")
-            else:
+        if button_text == "Register":
+            logger.log_message("Register button found. Initiating registration process.", level="info")
+            register_status = handle_event_registration(driver, wait, selectors)
+            if register_status == "failed":
                 error_reason = "Event registration failed."
                 logger.log_message(error_reason, level="error")
                 update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "failed", error_reason)
                 return
-
-            # Try to click the 'Attendees' link and paginate through the attendees
-            if click_attendees_link(wait, selectors):
+            else:
                 handle_pagination(driver, wait, scraping_status_id, sddh_id, event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason, selectors)
                 update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "success", error_reason)
-            else:
-                error_reason = "Attendees link not found."
-                logger.log_message(f"Attendees link not found. Skipping pagination.", level='error')
+ 
+
+        elif button_text == "Attend":
+            logger.log_message("Attend button found. Clicking Attend button.", level="info")
+            if not click_attend_button(wait, selectors):
+                error_reason = "Failed to click Attend button."
+                logger.log_message(error_reason, level="error")
+                update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "failed", error_reason)
+                return
+
+        # Step 5: Handle attendee list
+        if click_attendees_link(wait, selectors):
+            linkedin_link = driver.current_url
+            logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
+            handle_pagination(driver, wait, scraping_status_id, sddh_id, event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason, selectors)
+            update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "success", error_reason)
         else:
-            logger.log_message(f"Attend button not found. Checking for 'Attendees' link.", level='info')
+            logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
 
-            # Step 5: If "Attend" button is not found, check for "Attendees" link
-            if click_attendees_link(wait, selectors):
-                linkedin_link = driver.current_url
-                logger.log_message(f"Attendees link found. LinkedIn URL set to: {linkedin_link}", level='info')
-                handle_pagination(driver, wait, scraping_status_id, sddh_id, event_name, scraping_mode, linkedin_link, company_linkedin_url, error_reason, selectors)
-                update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "success", error_reason)
-            else:
-                logger.log_message(f"Attendees link not found. Checking for 'Show all events' button.", level='info')
+            # Step 6: Check for "Show All Events" button
+            if click_show_all_events(driver, wait):
+                event_links = get_upcoming_event_links(wait)
 
-                # Step 6: Check for "Show All Events" button
-                if click_show_all_events(driver, wait):
-                    event_links = get_upcoming_event_links(wait)
+                if event_links:
+                    logger.log_message(f"Found {len(event_links)} upcoming events.", level='info')
 
-                    if event_links:
-                        logger.log_message(f"Found {len(event_links)} upcoming events.", level='info')
-
-                        # Step 7: Process upcoming events if found
-                        for event_link in event_links:
-                            linkedin_link = event_link
-                            logger.log_message(f"Processing upcoming event link: {event_link}", level='info')
-                            process_event_page(event_link, scraping_status_id, sddh_id, event_name, scraping_mode, session_id, li_at_value)
-                    else:
-                        error_reason = "No upcoming events available"
-                        logger.log_message(f"No upcoming events available for URL: {company_linkedin_url}", level='info')
-                        update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "failed", error_reason)
-
+                    # Step 7: Process upcoming events if found
+                    for event_link in event_links:
+                        linkedin_link = event_link
+                        logger.log_message(f"Processing upcoming event link: {event_link}", level='info')
+                        process_event_page(event_link, scraping_status_id, sddh_id, event_name, scraping_mode, session_id, li_at_value)
                 else:
-                    error_reason = "Show All Events button not found."
-                    logger.log_message(f"Show All Events button not found for URL: {company_linkedin_url}", level='error')
+                    error_reason = "No upcoming events available"
+                    logger.log_message(f"No upcoming events available for URL: {company_linkedin_url}", level='info')
                     update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "failed", error_reason)
+
+            else:
+                error_reason = "Show All Events button not found."
+                logger.log_message(f"Show All Events button not found for URL: {company_linkedin_url}", level='error')
+                update_contact_scraping_status_by_id(scraping_status_id, sddh_id, "failed", error_reason)
 
     except Exception as e:
         logger.log_message(f"An error occurred while visiting linkedin link: {str(e)}", level='error')
