@@ -44,8 +44,8 @@ def fetch_categories():
         event_name = data.get('event_name')
         event_desc = data.get('event_description')
 
-        if not event_name or not event_desc:
-            return jsonify({"error": "Both 'eventName' and 'eventDesc' are required."}), 400
+        if not event_name.strip() or not event_desc.strip():
+            return jsonify({"error": "Both 'event name' and 'event description' are required."}), 400
 
         category = grabL1Category(event_name, event_desc)
   
